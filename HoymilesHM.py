@@ -40,9 +40,17 @@ class HoymilesHm:
     """
 
     __TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
-    __RX_CHANNELS : dict[int, list[int]] = { 3 : [40, 61], 23 : [61, 75], 40 : [3, 75], 61 : [3, 23], 75 : [23, 40] }
+
+    __RX_CHANNELS : dict[int, list[int]] = {
+        3 : [40, 61],
+        23 : [61, 75],
+        40 : [3, 75],
+        61 : [3, 23],
+        75 : [23, 40]
+    }
 
     __RX_PIPE = 1
+    __RX_PACKET_TIMEOUT_NS = 10_000_000
 
     # fixed serial number for this device
     __DTU_SERIAL_NUMBER = "99978563001"
@@ -61,7 +69,6 @@ class HoymilesHm:
     __expectedResponsePackages : list[int]
 
     __txChannel : int
-    __rxChannels : list[int]
 
     def __init__(self, inverterSerialNumber : str,  pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
         """ Creates a new communication object.
@@ -94,31 +101,90 @@ class HoymilesHm:
 
         self.__radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_HIGH, nrf.rf24_datarate_e.RF24_250KBPS)
 
-    def __TransmitPackage(self, package : bytearray) -> None:
+    def QueryInformations(self, timeout : float = 3) -> None:
+
+        # create request info message
+        payloadCurrentTime = HoymilesHm.__CreatePayloadFromTime(time.time())
+        packetRequestInfo = self.__CreatePacket(HoymilesHm.__CMD_TX_REQ_INFO, payloadCurrentTime)
+
+        startTime = time.time()
+
+
+
+
+    def __TransmitPacket(self, channel : int, packet : bytearray) -> None:
         """ Sends a package to the rceiver. The sender and receiver address is included in the package data.
             Receiver address: bytes 1 - 4.
             Sender address: bytes 5 - 8.
 
         Args:
-            package (bytearray): The package data.
+            channel (int): The channel where the data shall be sent.
+            packet (bytearray): The data.
         """
         if self.__radio is None:
-            raise Exception("Not initialized!")
+            raise Exception("Communication is not initialized!")
 
-        receiverAddr = b'\01' + package[1:5]
-        senderAddr = b'\01' + package[5:9]
+        receiverAddr = b'\01' + packet[1:5]
+        senderAddr = b'\01' + packet[5:9]
 
         self.__radio.flush_tx()
-        self.__radio.channel = self.__txChannel
+        self.__radio.channel = channel
         self.__radio.listen = False
         self.__radio.open_tx_pipe(receiverAddr)
-        self.__radio.open_rx_pipe(self.__RX_PIPE, senderAddr)
-        self.__radio.set_auto_ack(self.__RX_PIPE, True)
+        self.__radio.open_rx_pipe(HoymilesHm.__RX_PIPE, senderAddr)
+        self.__radio.set_auto_ack(HoymilesHm.__RX_PIPE, True)
 
-        self.__radio.write(package)
+        self.__radio.write(packet)
+    
+    def __ReceivePackets(self, channel : int, packetsToReceive : list[int]) -> dict[int, bytearray]:
+        """ Receives a list of packets. 
+
+        Args:
+            channel (int): The channel where to listen.
+            packetsToReceive (list[int]): List of type of packets to receive.
+
+        Returns:
+            dict[int, bytearray]: Received packets. (Can be less then requested number of packets.)
+        """
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+        
+        self.__radio.dynamic_payloads = True
+        self.__radio.channel = channel
+        self.__radio.listen = True
+
+        remainingPacketsToReceive = packetsToReceive.copy()
+        receivedPackets : dict[int, bytearray] = {}
+        startTime = time.time_ns()
+
+        while time.time_ns() - startTime  < HoymilesHm.__RX_PACKET_TIMEOUT_NS:
+
+            if not self.__radio.available():
+                continue
+            
+            buffer = self.__radio.read(32)
+
+            # ignore data if CRC error
+            checksum1 = crc.CalculateHoymilesCrc8(buffer, 26)
+            checksum2 = buffer[26]
+            if checksum1 != checksum2:
+                continue
+
+            receivedPacketType = buffer[9]
+
+            if receivedPacketType in remainingPacketsToReceive:
+                remainingPacketsToReceive.remove(receivedPacketType)
+
+                receivedPacketData = buffer[10:26]
+                receivedPackets[receivedPacketType] = receivedPacketData
+
+                if len(remainingPacketsToReceive):
+                    break
+
+        return receivedPackets
     
     @staticmethod
-    def __CreatePayloadTime(currentTime : float) -> bytearray:
+    def __CreatePayloadFromTime(currentTime : float) -> bytearray:
         """ Creates payload data filled with the time.
 
         Args:
@@ -135,7 +201,7 @@ class HoymilesHm:
 
         return payload
 
-    def __CreateDataPacket(self, packetCommand : int, payload : bytearray, frameId : int = 0) -> bytearray:
+    def __CreatePacket(self, packetCommand : int, payload : bytearray, frameId : int = 0) -> bytearray:
         """ Creates a data packet.
 
         Args:
@@ -155,9 +221,9 @@ class HoymilesHm:
 
         if len(payload) > 0:
             packet.extend(payload)
-            packet += struct.pack('>H', crc.CalculateHoymilesCrc16(payload)) 
+            packet += struct.pack('>H', crc.CalculateHoymilesCrc16(payload, len(payload))) 
 
-        packet.extend(struct.pack('B', crc.CalculateHoymilesCrc8(packet)))
+        packet.extend(struct.pack('B', crc.CalculateHoymilesCrc8(packet, len(packet))))
 
         return packet
     
@@ -165,7 +231,7 @@ class HoymilesHm:
         """ Prints NRF24L01 module info on standard output.
         """
         if self.__radio is None:
-            raise Exception("Not initialized!")
+            raise Exception("Communication is not initialized!")
         
         self.__radio.print_pretty_details()
 
@@ -191,6 +257,14 @@ class HoymilesHm:
 
     @staticmethod
     def __GetResponsePacketTypesFromInverterType(inverterType : InverterType) -> list[int]:
+        """ Returns a list of the packet types that the inverter will send if data is querried.
+
+        Args:
+            inverterType (InverterType): The type of the inverter.
+
+        Returns:
+            list[int]: List of packet types for a response on a data query.
+        """
         match inverterType:
             case InverterType.HM300:
                 return [ 0x01, 0x82 ]

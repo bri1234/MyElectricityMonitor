@@ -59,37 +59,38 @@ __CRC16_X25_TABLE = [
 	0x7BC7, 0x6A4E, 0x58D5, 0x495C,	0x3DE3, 0x2C6A, 0x1EF1, 0x0F78]
 
 def CalculateSmlCrc16(data : bytearray, dataLen : int) -> int:
-    """ Calculates the CRC16 checksum for Smart Message Language of a byte array.
+	""" Calculates the CRC16 checksum for Smart Message Language of a byte array.
 
-    Args:
-        data (bytearray): The byte array used to calculate the ckecksum.
+	Args:
+		data (bytearray): The byte array on which the ckecksum is to be calculated.
+		dataLen (int): Number of bytes to be used to calculate the checksum.
 
-    Returns:
-        int: The CRC16 checksum of the byte array.
-    """
+	Returns:
+		int: The CRC16 checksum of the byte array.
+	"""
+	crcsum = 0xFFFF
 
-    crcsum = 0xFFFF
+	for idx in range(dataLen):
+		crcsum = __CRC16_X25_TABLE[(data[idx] ^ crcsum) & 0xff] ^ (crcsum >> 8 & 0xff)
 
-    for idx in range(dataLen):
-        crcsum = __CRC16_X25_TABLE[(data[idx] ^ crcsum) & 0xff] ^ (crcsum >> 8 & 0xff)
+	crcsum ^= 0xffff
+	return crcsum
 
-    crcsum ^= 0xffff
-    return crcsum
-
-def CalculateHoymilesCrc8(data : bytearray) -> int:
+def CalculateHoymilesCrc8(data : bytearray, dataLen : int) -> int:
 	""" Calculates CRC8 checksum for communication with hoymiles inverters.
 		poly = 0x101; reversed = False; init-value = 0x00; XOR-out = 0x00; Check = 0x31
 
 	Args:
-        data (bytearray): The byte array used to calculate the ckecksum.
+        data (bytearray): The byte array on which the ckecksum is to be calculated.
+		dataLen (int): Number of bytes to be used to calculate the checksum.
 
 	Returns:
 		int: The crc checksum.
 	"""
 	crc = 0
 
-	for b in data:
-		crc ^= b
+	for idx in range(dataLen):
+		crc ^= data[idx]
 		for _ in range(8):
 			crc <<= 1
 			if crc & 0x0100:
@@ -98,12 +99,13 @@ def CalculateHoymilesCrc8(data : bytearray) -> int:
 
 	return crc
 
-def CalculateHoymilesCrc16(data : bytearray) -> int:
+def CalculateHoymilesCrc16(data : bytearray, dataLen : int) -> int:
 	""" Calculates CRC16 checksum for communication with hoymiles inverters.
 		poly = 0x8005; reversed = True; init-value = 0xFFFF; XOR-out = 0x0000; Check = 0x4B37
 
 	Args:
-        data (bytearray): The byte array used to calculate the ckecksum.
+        data (bytearray): The byte array on which the ckecksum is to be calculated.
+		dataLen (int): Number of bytes to be used to calculate the checksum.
 
 	Returns:
 		int: The crc checksum.
@@ -111,8 +113,8 @@ def CalculateHoymilesCrc16(data : bytearray) -> int:
 
 	crc = 0xFFFF
 
-	for b in data:
-		crc ^= b
+	for idx in range(dataLen):
+		crc ^= data[idx]
 		for _ in range(8):
 			if crc & 0x0001:
 				crc >>= 1
