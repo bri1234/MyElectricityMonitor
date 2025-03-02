@@ -25,6 +25,9 @@ IN THE SOFTWARE.
 """
 
 import pyrf24 as nrf
+import MyCrc as crc
+import time
+import struct
 from enum import Enum
 
 class InverterType(Enum):
@@ -36,6 +39,17 @@ class HoymilesHm:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
     """
 
+    __TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
+    __RX_CHANNELS : dict[int, list[int]] = { 3 : [40, 61], 23 : [61, 75], 40 : [3, 75], 61 : [3, 23], 75 : [23, 40] }
+
+    __RX_PIPE = 1
+
+    # fixed serial number for this device
+    __DTU_SERIAL_NUMBER = "99978563001"
+
+    __CMD_TX_REQ_INFO = 0x15
+    __CMD_TX_REQ_DEVCONTROL = 0x51
+
     __inverterSerialNumber : str
     __inverterType : InverterType
     __pinCsn : int
@@ -45,9 +59,6 @@ class HoymilesHm:
     __radio : nrf.RF24 | None
 
     __expectedResponsePackages : list[int]
-
-    __TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
-    __RX_CHANNELS : dict[int, list[int]] = { 3 : [40, 61], 23 : [61, 75], 40 : [3, 75], 61 : [3, 23], 75 : [23, 40] }
 
     __txChannel : int
     __rxChannels : list[int]
@@ -62,7 +73,7 @@ class HoymilesHm:
             spiFrequency (int, optional): The SPI frequency in Hz. Defaults to 1000000.
             txChannelNumber (int, optional): TX channel number 0 .. 4.
         """
-        self.__inverterSerialNumber = inverterSerialNumber.strip()
+        self.__inverterSerialNumber = inverterSerialNumber
         self.__pinCsn = pinCsn
         self.__pinCe = pinCe
         self.__spiFrequency = spiFrequency
@@ -74,7 +85,7 @@ class HoymilesHm:
         self.__rxChannel = HoymilesHm.__RX_CHANNELS[self.__txChannel]
         
     def InitializeCommunication(self) -> None:
-        """ Initializes the communication.
+        """ Initializes the NRF24L01 communication.
         """
         self.__radio = nrf.RF24(self.__pinCe, self.__pinCsn, self.__spiFrequency)
 
@@ -83,8 +94,72 @@ class HoymilesHm:
 
         self.__radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_HIGH, nrf.rf24_datarate_e.RF24_250KBPS)
 
-    def __TransmitPackage(self) -> None:
-        pass
+    def __TransmitPackage(self, package : bytearray) -> None:
+        """ Sends a package to the rceiver. The sender and receiver address is included in the package data.
+            Receiver address: bytes 1 - 4.
+            Sender address: bytes 5 - 8.
+
+        Args:
+            package (bytearray): The package data.
+        """
+        if self.__radio is None:
+            raise Exception("Not initialized!")
+
+        receiverAddr = b'\01' + package[1:5]
+        senderAddr = b'\01' + package[5:9]
+
+        self.__radio.flush_tx()
+        self.__radio.channel = self.__txChannel
+        self.__radio.listen = False
+        self.__radio.open_tx_pipe(receiverAddr)
+        self.__radio.open_rx_pipe(self.__RX_PIPE, senderAddr)
+        self.__radio.set_auto_ack(self.__RX_PIPE, True)
+
+        self.__radio.write(package)
+    
+    @staticmethod
+    def __CreatePayloadTime(currentTime : float) -> bytearray:
+        """ Creates payload data filled with the time.
+
+        Args:
+            currentTime (float): The current time.
+
+        Returns:
+            bytearray: The payload data.
+        """
+        payload = bytearray(13)
+
+        payload[0] = 0x0B
+        payload[2:5] = struct.pack('>L', currentTime)
+        payload[9] = 0x05
+
+        return payload
+
+    def __CreateDataPacket(self, packetCommand : int, payload : bytearray, frameId : int = 0) -> bytearray:
+        """ Creates a data packet.
+
+        Args:
+            packetType (int): The packet command.
+            payload (bytearray): The data to be sent.
+            frameId (int, optional): The frame ID. Defaults to 0.
+
+        Returns:
+            bytearray: _description_
+        """
+        packet = bytearray()
+
+        packet.extend(packetCommand.to_bytes(1, 'big'))
+        packet.extend(bytearray.fromhex(self.__inverterSerialNumber[-8:]))
+        packet.extend(bytearray.fromhex(HoymilesHm.__DTU_SERIAL_NUMBER[-8:]))
+        packet.extend(int(0x80 + frameId).to_bytes(1, 'big'))
+
+        if len(payload) > 0:
+            packet.extend(payload)
+            packet += struct.pack('>H', crc.CalculateHoymilesCrc16(payload)) 
+
+        packet.extend(struct.pack('B', crc.CalculateHoymilesCrc8(packet)))
+
+        return packet
     
     def PrintInfo(self) -> None:
         """ Prints NRF24L01 module info on standard output.

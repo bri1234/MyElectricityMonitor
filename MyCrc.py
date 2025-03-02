@@ -76,3 +76,48 @@ def CalculateSmlCrc16(data : bytearray, dataLen : int) -> int:
     crcsum ^= 0xffff
     return crcsum
 
+def CalculateHoymilesCrc8(data : bytearray) -> int:
+	""" Calculates CRC8 checksum for communication with hoymiles inverters.
+		poly = 0x101; reversed = False; init-value = 0x00; XOR-out = 0x00; Check = 0x31
+
+	Args:
+        data (bytearray): The byte array used to calculate the ckecksum.
+
+	Returns:
+		int: The crc checksum.
+	"""
+	crc = 0
+
+	for b in data:
+		crc ^= b
+		for _ in range(8):
+			crc <<= 1
+			if crc & 0x0100:
+				crc ^= 0x01
+			crc &= 0xFF
+
+	return crc
+
+def CalculateHoymilesCrc16(data : bytearray) -> int:
+	""" Calculates CRC16 checksum for communication with hoymiles inverters.
+		poly = 0x8005; reversed = True; init-value = 0xFFFF; XOR-out = 0x0000; Check = 0x4B37
+
+	Args:
+        data (bytearray): The byte array used to calculate the ckecksum.
+
+	Returns:
+		int: The crc checksum.
+	"""
+
+	crc = 0xFFFF
+
+	for b in data:
+		crc ^= b
+		for _ in range(8):
+			if crc & 0x0001:
+				crc >>= 1
+				crc ^= 0xA001
+			else:
+				crc >>= 1
+
+	return crc
