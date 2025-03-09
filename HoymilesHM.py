@@ -1,5 +1,6 @@
 """
-Communication functions for Hoymiles HM-300, HM-600, HM-800, ... inverters.
+Communication functions for Hoymiles HM300, HM350, HM400, HM600, HM700,
+HM800, HM1200 & HM1500 inverters.
 
 Copyright (C) 2025  Torsten Brischalle
 email: torsten@brischalle.de
@@ -27,12 +28,13 @@ IN THE SOFTWARE.
 import pyrf24 as nrf
 import MyCrc as crc
 import time
+import uuid
 from enum import Enum, IntEnum
 
 class InverterType(Enum):
-    HM300 = 1
-    HM600 = 2
-    HM1200 = 3
+    InverterOneChannel = 1
+    InverterTwoChannels = 2
+    InverterFourChannels = 4
 
 class InverterCmd(IntEnum):
     TX_REQ_INFO = 0x15
@@ -61,11 +63,10 @@ class HoymilesHmDtu:
     __RX_PACKET_TIMEOUT_NS = 10_000_000
     __MAX_PACKET_SIZE = 32
 
-    __dtuSerialNumber : str
-    __dtuRadioId : bytearray        # CP_U32_LittleEndian(&mTxBuf[5], mDtuSn);
+    __dtuRadioId : bytes
 
     __inverterSerialNumber : str
-    __inverterRadioId : bytearray   # CP_U32_BigEndian(&mTxBuf[1], ivId >> 8);
+    __inverterRadioId : bytes
     __inverterType : InverterType
 
     __pinCsn : int
@@ -74,7 +75,7 @@ class HoymilesHmDtu:
     
     __radio : nrf.RF24 | None
 
-    __expectedResponsePackages : list[int]
+    __expectedResponsePackets : list[int]
 
     __txChannel : int
 
@@ -94,8 +95,11 @@ class HoymilesHmDtu:
         self.__pinCe = pinCe
         self.__spiFrequency = spiFrequency
 
+        self.__dtuRadioId = HoymilesHmDtu.__GenerateDtuRadioId()
+        self.__inverterRadioId = HoymilesHmDtu.__GetInverterRadioId(self.__inverterSerialNumber)
+
         self.__inverterType = HoymilesHmDtu.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
-        self.__expectedResponsePackages = HoymilesHmDtu.__GetResponsePacketTypesFromInverterType(self.__inverterType)
+        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponsePacketTypesFromInverterType(self.__inverterType)
 
         self.__txChannel = HoymilesHmDtu.__TX_CHANNELS[txChannelNumber]
         self.__rxChannel = HoymilesHmDtu.__RX_CHANNELS[self.__txChannel]
@@ -114,7 +118,8 @@ class HoymilesHmDtu:
         radio.set_auto_ack(HoymilesHmDtu.__RX_PIPE, True)
         radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
         radio.address_width = 5
-        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId)
+
+        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId) # TODO: maybe reverse!!!
 
         self.__radio = radio
 
@@ -243,6 +248,7 @@ class HoymilesHmDtu:
     
     def __CreatePacket(self, command : InverterCmd, frame : InverterFrame, payload : bytes | bytearray | None) -> bytearray:
         """ Creates the packet.
+            A paket is used for communication between the DTU (this device) and the inverter.
 
         Args:
             command (InverterCmd): The packet command.
@@ -270,7 +276,7 @@ class HoymilesHmDtu:
         return packet
     
     def PrintNrf24l01Info(self) -> None:
-        """ Prints NRF24L01 module info on standard output.
+        """ Prints NRF24L01 module information on standard output.
         """
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
@@ -287,15 +293,21 @@ class HoymilesHmDtu:
         Returns:
             int: The inverter type: 1 = HM300, HM350, HM400; 2 = HM600, HM700, HM800; 3 = HM1200, HM1500
         """
-        match inverterSerialNumber[:4]:
-            case "1121":
-                return InverterType.HM300
-            case "1141":
-                return InverterType.HM600
-            case "1161":
-                return InverterType.HM1200
+        match inverterSerialNumber[0:2]:
+            case "10" | "11":
+                match inverterSerialNumber[2:4]:
+                    case "21" | "22" | "24":
+                        return InverterType.InverterOneChannel
+                    case "41" | "42" | "44":
+                        return InverterType.InverterTwoChannels
+                    case "61" | "62" | "64":
+                        return InverterType.InverterFourChannels
+                    case _:
+                        pass
             case _:
-                raise Exception(f"Inverter type is not supported. (Serial number must start with: 1121, 1141 or 1161)")
+                pass
+
+        raise Exception(f"Inverter type with serial number {inverterSerialNumber} is not supported.")
 
     @staticmethod
     def __GetResponsePacketTypesFromInverterType(inverterType : InverterType) -> list[int]:
@@ -308,27 +320,51 @@ class HoymilesHmDtu:
             list[int]: List of packet types for a response on a data query.
         """
         match inverterType:
-            case InverterType.HM300:
+            case InverterType.InverterOneChannel:
                 return [ 0x01, 0x82 ]
-            case InverterType.HM600:
+            case InverterType.InverterTwoChannels:
                 return [ 0x01, 0x02, 0x83 ]
-            case InverterType.HM1200:
+            case InverterType.InverterFourChannels:
                 return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]
             case _:
                 raise Exception(f"Unsupported inverter type {inverterType}")
 
     @staticmethod
     def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
-        
+        """ Returns the inverter radio ID from the serial number.
+            The radio ID is used to send and receive packets.
+
+        Args:
+            inverterSerialNumber (str): The inverter serial number.
+
+        Returns:
+            bytes: The inverter radio ID.
+        """
+        serialNumberStr = inverterSerialNumber[4:]
+        serialNumber = bytearray.fromhex(serialNumberStr)
+        serialNumber.reverse()
+
+        return bytes(serialNumber)
+
     @staticmethod
-    def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
-        
-    @staticmethod
-    def __GenerateDtuSerialNumber() -> str:
-        id = 56346234234566
-        id &= 0x0FFFFFFF
-        id |= 0x80000000
-        return str(id)
+    def __GenerateDtuRadioId() -> bytes:
+        """ Generates a DTU radio ID (data transfer unit, this device) from the system UUID.
+            The radio ID is used to send and receive packets.
+
+        Returns:
+            bytes: The DTU radio ID.
+        """
+
+        u = uuid.uuid1().int
+
+        id = 0x81000001
+        id |= (u % 10) << 4
+        id |= ((u // 10) % 10) << 8
+        id |= ((u // 100) % 10) << 12
+        id |= ((u // 1000) % 10) << 16
+        id |= ((u // 10000) % 10) << 20
+
+        return id.to_bytes(4, "big", signed=False)
 
 if __name__ == "__main__":
 
