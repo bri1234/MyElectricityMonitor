@@ -79,6 +79,8 @@ class HoymilesHmDtu:
 
     __txChannel : int
 
+    powerLevel = nrf.rf24_pa_dbm_e.RF24_PA_HIGH
+
     def __init__(self, inverterSerialNumber : str,
                  pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
         """ Creates a new communication object.
@@ -119,7 +121,7 @@ class HoymilesHmDtu:
         radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
         radio.address_width = 5
 
-        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId) # TODO: maybe reverse!!!
+        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId)  # TODO: maybe reverse?!
 
         self.__radio = radio
 
@@ -146,15 +148,15 @@ class HoymilesHmDtu:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
-        receiverAddr = b'\01' + packet[1:5]
-        senderAddr = b'\01' + packet[5:9]
+        radio = self.__radio
 
-        self.__radio.flush_tx()
-        self.__radio.channel = channel
-        self.__radio.listen = False
-        self.__radio.open_tx_pipe(receiverAddr)
+        radio.set_radiation(self.powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
+        radio.listen = False
+        radio.flush_rx()
+        radio.channel = channel
+        radio.open_tx_pipe(self.__inverterRadioId)   # TODO: maybe reverse?!
 
-        self.__radio.write(packet)
+        radio.write(packet)
     
     def __ReceivePackets(self, channel : int, packetsToReceive : list[int]) -> dict[int, bytearray]:
         """ Receives a list of packets. 
