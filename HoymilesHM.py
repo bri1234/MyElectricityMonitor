@@ -79,8 +79,6 @@ class HoymilesHmDtu:
 
     __txChannel : int
 
-    powerLevel = nrf.rf24_pa_dbm_e.RF24_PA_HIGH
-
     def __init__(self, inverterSerialNumber : str,
                  pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
         """ Creates a new communication object.
@@ -133,13 +131,19 @@ class HoymilesHmDtu:
 
         startTime = time.time()
 
+    def __SetPowerLevel(self, powerLevel : nrf.rf24_pa_dbm_e) -> None:
+        """ Changes the output power level.
 
+        Args:
+            powerLevel (nrf.rf24_pa_dbm_e): The new power level.
+        """
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
 
+        self.__radio.set_radiation(powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
 
-    def __TransmitPacket(self, channel : int, packet : bytearray) -> None:
-        """ Sends a package to the rceiver. The sender and receiver address is included in the package data.
-            Receiver address: bytes 1 - 4.
-            Sender address: bytes 5 - 8.
+    def __TransmitPacket(self, channel : int, packet : bytearray | bytes) -> None:
+        """ Sends a package to the receiver.
 
         Args:
             channel (int): The channel where the data shall be sent.
@@ -150,7 +154,6 @@ class HoymilesHmDtu:
 
         radio = self.__radio
 
-        radio.set_radiation(self.powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
         radio.listen = False
         radio.flush_rx()
         radio.channel = channel
@@ -158,6 +161,32 @@ class HoymilesHmDtu:
 
         radio.write(packet)
     
+    def TestReceivePackets(self, channel : int, timeout : float) -> None:
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+
+        radio = self.__radio
+
+        radio.channel = channel
+        radio.listen = True
+
+        startTime = time.time()
+        while time.time() - startTime < timeout:
+            
+            isDataAvailable, pipeNum = radio.available_pipe()
+            if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
+                continue
+
+            packetLength = radio.get_dynamic_payload_size()
+            packet = radio.read(packetLength)
+
+            print(f"packet received, len = {len(packet)}")
+
+
+        radio.listen = False
+
+        
+
     def __ReceivePackets(self, channel : int, packetsToReceive : list[int]) -> dict[int, bytearray]:
         """ Receives a list of packets. 
 
