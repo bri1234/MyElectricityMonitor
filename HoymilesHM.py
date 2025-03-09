@@ -27,16 +27,24 @@ IN THE SOFTWARE.
 import pyrf24 as nrf
 import MyCrc as crc
 import time
-import struct
-from enum import Enum
+from enum import Enum, IntEnum
 
 class InverterType(Enum):
     HM300 = 1
     HM600 = 2
     HM1200 = 3
 
-class HoymilesHm:
+class InverterCmd(IntEnum):
+    TX_REQ_INFO = 0x15
+    TX_REQ_DEVCONTROL = 0x51
+
+class InverterFrame(IntEnum):
+    ALL_FRAMES = 0x80
+    SINGLE_FRAME = 0x81
+
+class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
+        DTU means 'data transfer unit'.
     """
 
     __TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
@@ -51,15 +59,15 @@ class HoymilesHm:
 
     __RX_PIPE = 1
     __RX_PACKET_TIMEOUT_NS = 10_000_000
+    __MAX_PACKET_SIZE = 32
 
-    # fixed serial number for this device
-    __DTU_SERIAL_NUMBER = "99978563001"
-
-    __CMD_TX_REQ_INFO = 0x15
-    __CMD_TX_REQ_DEVCONTROL = 0x51
+    __dtuSerialNumber : str
+    __dtuRadioId : bytearray        # CP_U32_LittleEndian(&mTxBuf[5], mDtuSn);
 
     __inverterSerialNumber : str
+    __inverterRadioId : bytearray   # CP_U32_BigEndian(&mTxBuf[1], ivId >> 8);
     __inverterType : InverterType
+
     __pinCsn : int
     __pinCe : int
     __spiFrequency : int
@@ -70,7 +78,8 @@ class HoymilesHm:
 
     __txChannel : int
 
-    def __init__(self, inverterSerialNumber : str,  pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
+    def __init__(self, inverterSerialNumber : str,
+                 pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
         """ Creates a new communication object.
 
         Args:
@@ -85,27 +94,35 @@ class HoymilesHm:
         self.__pinCe = pinCe
         self.__spiFrequency = spiFrequency
 
-        self.__inverterType = HoymilesHm.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
-        self.__expectedResponsePackages = HoymilesHm.__GetResponsePacketTypesFromInverterType(self.__inverterType)
+        self.__inverterType = HoymilesHmDtu.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
+        self.__expectedResponsePackages = HoymilesHmDtu.__GetResponsePacketTypesFromInverterType(self.__inverterType)
 
-        self.__txChannel = HoymilesHm.__TX_CHANNELS[txChannelNumber]
-        self.__rxChannel = HoymilesHm.__RX_CHANNELS[self.__txChannel]
+        self.__txChannel = HoymilesHmDtu.__TX_CHANNELS[txChannelNumber]
+        self.__rxChannel = HoymilesHmDtu.__RX_CHANNELS[self.__txChannel]
         
     def InitializeCommunication(self) -> None:
         """ Initializes the NRF24L01 communication.
         """
-        self.__radio = nrf.RF24(self.__pinCe, self.__pinCsn, self.__spiFrequency)
+        radio = nrf.RF24(self.__pinCe, self.__pinCsn, self.__spiFrequency)
 
-        if not self.__radio.begin():
+        if not radio.begin():
             raise Exception("Can not initialize RF24!")
 
-        self.__radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_HIGH, nrf.rf24_datarate_e.RF24_250KBPS)
+        radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_LOW, nrf.rf24_datarate_e.RF24_250KBPS)
+        radio.set_retries(3, 15)
+        radio.dynamic_payloads = True
+        radio.set_auto_ack(HoymilesHmDtu.__RX_PIPE, True)
+        radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
+        radio.address_width = 5
+        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId)
+
+        self.__radio = radio
 
     def QueryInformations(self, timeout : float = 3) -> None:
 
         # create request info message
-        payloadCurrentTime = HoymilesHm.__CreatePayloadFromTime(time.time())
-        packetRequestInfo = self.__CreatePacket(HoymilesHm.__CMD_TX_REQ_INFO, payloadCurrentTime)
+        payloadCurrentTime = HoymilesHmDtu.__CreatePayloadFromTime(time.time())
+        packetRequestInfo = self.__CreatePacket(HoymilesHmDtu.__CMD_TX_REQ_INFO, payloadCurrentTime)
 
         startTime = time.time()
 
@@ -131,8 +148,6 @@ class HoymilesHm:
         self.__radio.channel = channel
         self.__radio.listen = False
         self.__radio.open_tx_pipe(receiverAddr)
-        self.__radio.open_rx_pipe(HoymilesHm.__RX_PIPE, senderAddr)
-        self.__radio.set_auto_ack(HoymilesHm.__RX_PIPE, True)
 
         self.__radio.write(packet)
     
@@ -149,7 +164,6 @@ class HoymilesHm:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
         
-        self.__radio.dynamic_payloads = True
         self.__radio.channel = channel
         self.__radio.listen = True
 
@@ -157,7 +171,7 @@ class HoymilesHm:
         receivedPackets : dict[int, bytearray] = {}
         startTime = time.time_ns()
 
-        while time.time_ns() - startTime  < HoymilesHm.__RX_PACKET_TIMEOUT_NS:
+        while time.time_ns() - startTime  < HoymilesHmDtu.__RX_PACKET_TIMEOUT_NS:
 
             if not self.__radio.available():
                 continue
@@ -193,41 +207,69 @@ class HoymilesHm:
         Returns:
             bytearray: The payload data.
         """
-        payload = bytearray(13)
+        payload = bytearray(14)
 
         payload[0] = 0x0B
-        payload[2:5] = struct.pack('>L', currentTime)
+        payload[1] = 0x00
+        payload[2:6] = int(currentTime).to_bytes(4, "big", signed = False)
         payload[9] = 0x05
 
+        if len(payload) != 14:
+            raise Exception(f"Internal error __CreatePayloadFromTime: size {len(payload)} != 14")
+        
         return payload
-
-    def __CreatePacket(self, packetCommand : int, payload : bytearray, frameId : int = 0) -> bytearray:
-        """ Creates a data packet.
+    
+    def __CreatePacketHeader(self, command : InverterCmd, frame : InverterFrame) -> bytearray:
+        """ Creates the packet header.
 
         Args:
-            packetType (int): The packet command.
-            payload (bytearray): The data to be sent.
-            frameId (int, optional): The frame ID. Defaults to 0.
+            command (InverterCmd): The packet command.
+            frame (InverterFrame): The packet frame.
 
         Returns:
-            bytearray: _description_
+            bytearray: The packet header.
         """
-        packet = bytearray()
+        header = bytearray(10)
 
-        packet.extend(packetCommand.to_bytes(1, 'big'))
-        packet.extend(bytearray.fromhex(self.__inverterSerialNumber[-8:]))
-        packet.extend(bytearray.fromhex(HoymilesHm.__DTU_SERIAL_NUMBER[-8:]))
-        packet.extend(int(0x80 + frameId).to_bytes(1, 'big'))
+        header[0] = command
+        header[1:5] = self.__inverterRadioId
+        header[5:9] = self.__dtuRadioId
+        header[9] = frame
+        
+        if len(header) != 10:
+            raise Exception(f"Internal error __CreatePacketHeader: size {len(header)} != 10")
+        
+        return header
+    
+    def __CreatePacket(self, command : InverterCmd, frame : InverterFrame, payload : bytes | bytearray | None) -> bytearray:
+        """ Creates the packet.
 
-        if len(payload) > 0:
+        Args:
+            command (InverterCmd): The packet command.
+            frame (InverterFrame): The packet frame.
+            payload (bytes | bytearray | None): The payload to be sent.
+
+        Returns:
+            bytearray: The packet.
+        """
+
+        packet = self.__CreatePacketHeader(command, frame)
+
+        if (payload is not None) and (len(payload) > 0):
             packet.extend(payload)
-            packet += struct.pack('>H', crc.CalculateHoymilesCrc16(payload, len(payload))) 
 
-        packet.extend(struct.pack('B', crc.CalculateHoymilesCrc8(packet, len(packet))))
+            crc16 = crc.CalculateHoymilesCrc16(payload, len(payload))
+            packet.extend(crc16.to_bytes(2, "big", signed=False))
 
+        crc8 = crc.CalculateHoymilesCrc8(packet, len(packet))
+        packet.extend(crc8.to_bytes(1, "big", signed=False))
+
+        if len(packet) > HoymilesHmDtu.__MAX_PACKET_SIZE:
+            raise Exception(f"Internal error __CreatePacket: packet size ({len(packet)}) > MAX_PACKET_SIZE ({HoymilesHmDtu.__MAX_PACKET_SIZE})")
+        
         return packet
     
-    def PrintInfo(self) -> None:
+    def PrintNrf24l01Info(self) -> None:
         """ Prints NRF24L01 module info on standard output.
         """
         if self.__radio is None:
@@ -275,12 +317,23 @@ class HoymilesHm:
             case _:
                 raise Exception(f"Unsupported inverter type {inverterType}")
 
-
+    @staticmethod
+    def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
+        
+    @staticmethod
+    def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
+        
+    @staticmethod
+    def __GenerateDtuSerialNumber() -> str:
+        id = 56346234234566
+        id &= 0x0FFFFFFF
+        id |= 0x80000000
+        return str(id)
 
 if __name__ == "__main__":
 
-    hm = HoymilesHm("114184020874", 0, 24, 1000000)
+    hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
     hm.InitializeCommunication()
-    hm.PrintInfo()
+    hm.PrintNrf24l01Info()
 
         

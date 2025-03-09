@@ -58,7 +58,7 @@ __CRC16_X25_TABLE = [
 	0xF78F, 0xE606, 0xD49D, 0xC514, 0xB1AB, 0xA022,	0x92B9, 0x8330,
 	0x7BC7, 0x6A4E, 0x58D5, 0x495C,	0x3DE3, 0x2C6A, 0x1EF1, 0x0F78]
 
-def CalculateSmlCrc16(data : bytearray, dataLen : int) -> int:
+def CalculateSmlCrc16(data : bytes | bytearray, dataLen : int) -> int:
 	""" Calculates the CRC16 checksum for Smart Message Language of a byte array.
 
 	Args:
@@ -76,7 +76,7 @@ def CalculateSmlCrc16(data : bytearray, dataLen : int) -> int:
 	crcsum ^= 0xffff
 	return crcsum
 
-def CalculateHoymilesCrc8(data : bytearray, dataLen : int) -> int:
+def CalculateHoymilesCrc8(data : bytes | bytearray, dataLen : int) -> int:
 	""" Calculates CRC8 checksum for communication with hoymiles inverters.
 		poly = 0x101; reversed = False; init-value = 0x00; XOR-out = 0x00; Check = 0x31
 
@@ -99,7 +99,7 @@ def CalculateHoymilesCrc8(data : bytearray, dataLen : int) -> int:
 
 	return crc
 
-def CalculateHoymilesCrc16(data : bytearray, dataLen : int) -> int:
+def CalculateHoymilesCrc16(data : bytes | bytearray, dataLen : int) -> int:
 	""" Calculates CRC16 checksum for communication with hoymiles inverters.
 		poly = 0x8005; reversed = True; init-value = 0xFFFF; XOR-out = 0x0000; Check = 0x4B37
 
