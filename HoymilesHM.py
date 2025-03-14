@@ -29,35 +29,75 @@ import pyrf24 as nrf
 import MyCrc as crc
 import time
 import uuid
+import textwrap
 from enum import Enum, IntEnum
 
 class InverterType(Enum):
+    """ Inverter types = number of channels = number of solar panels per inverter.
+    """
     InverterOneChannel = 1
     InverterTwoChannels = 2
     InverterFourChannels = 4
 
-class InverterCmd(IntEnum):
-    TX_REQ_INFO = 0x15
-    TX_REQ_DEVCONTROL = 0x51
+class InverterRequest(IntEnum):
+    """ Inverter remote command definitions.
+    """
+
+    VERSION = 0x0F
+    INFO = 0x15
+    DEVIVE_CONTROL = 0x51
+
+    @staticmethod
+    def ToString(request : int) -> str:
+        match request:
+            case InverterRequest.VERSION:
+                return "VERSION"
+            case InverterRequest.INFO:
+                return "INFO"
+            case InverterRequest.DEVIVE_CONTROL:
+                return "DEVIVE_CONTROL"
+            case _:
+                return "???"
+
+class InverterResponse(IntEnum):
+    """ Inverter remote answer definitions.
+    """
+
+    VERSION = InverterRequest.VERSION | 0x80
+    INFO = InverterRequest.INFO | 0x80
+    DEVIVE_CONTROL = InverterRequest.DEVIVE_CONTROL | 0x80
+
+    @staticmethod
+    def ToString(response : int) -> str:
+        match response:
+            case InverterResponse.VERSION:
+                return "VERSION"
+            case InverterResponse.INFO:
+                return "INFO"
+            case InverterResponse.DEVIVE_CONTROL:
+                return "DEVIVE_CONTROL"
+            case _:
+                return "???"
 
 class InverterFrame(IntEnum):
+    """ Packet numbering. (???)
+    """
     ALL_FRAMES = 0x80
     SINGLE_FRAME = 0x81
+
+class InverterChannels:
+    """ Inverter RF channel definitions.
+
+        RF channel frequency: F0= 2400 + RF_CH [MHz]
+    """
+
+    # RF channels: send request on one channel, listen for resposne on all other channels
+    RF_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
         DTU means 'data transfer unit'.
     """
-
-    __TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
-
-    __RX_CHANNELS : dict[int, list[int]] = {
-        3 : [40, 61],
-        23 : [61, 75],
-        40 : [3, 75],
-        61 : [3, 23],
-        75 : [23, 40]
-    }
 
     __RX_PIPE = 1
     __RX_PACKET_TIMEOUT_NS = 10_000_000
@@ -77,10 +117,8 @@ class HoymilesHmDtu:
 
     __expectedResponsePackets : list[int]
 
-    __txChannel : int
-
     def __init__(self, inverterSerialNumber : str,
-                 pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000, txChannelNumber : int = 0) -> None:
+                 pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000) -> None:
         """ Creates a new communication object.
 
         Args:
@@ -100,9 +138,6 @@ class HoymilesHmDtu:
 
         self.__inverterType = HoymilesHmDtu.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
         self.__expectedResponsePackets = HoymilesHmDtu.__GetResponsePacketTypesFromInverterType(self.__inverterType)
-
-        self.__txChannel = HoymilesHmDtu.__TX_CHANNELS[txChannelNumber]
-        self.__rxChannel = HoymilesHmDtu.__RX_CHANNELS[self.__txChannel]
         
     def InitializeCommunication(self) -> None:
         """ Initializes the NRF24L01 communication.
@@ -113,23 +148,23 @@ class HoymilesHmDtu:
             raise Exception("Can not initialize RF24!")
 
         radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_LOW, nrf.rf24_datarate_e.RF24_250KBPS)
-        radio.set_retries(3, 15)
+        radio.set_retries(10, 15)
         radio.dynamic_payloads = True
         radio.set_auto_ack(HoymilesHmDtu.__RX_PIPE, True)
         radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
         radio.address_width = 5
 
-        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioId)  # TODO: maybe reverse?!
+        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, b'\01' + self.__dtuRadioId) 
 
         self.__radio = radio
 
-    def QueryInformations(self, timeout : float = 3) -> None:
+    # def QueryInformations(self, timeout : float = 3) -> None:
 
-        # create request info message
-        payloadCurrentTime = HoymilesHmDtu.__CreatePayloadFromTime(time.time())
-        packetRequestInfo = self.__CreatePacket(HoymilesHmDtu.__CMD_TX_REQ_INFO, payloadCurrentTime)
+    #     # create request info message
+    #     payloadCurrentTime = HoymilesHmDtu.__CreatePayloadFromTime(time.time())
+    #     packetRequestInfo = self.__CreatePacket(HoymilesHmDtu.__CMD_TX_REQ_INFO, payloadCurrentTime)
 
-        startTime = time.time()
+    #     startTime = time.time()
 
     def __SetPowerLevel(self, powerLevel : nrf.rf24_pa_dbm_e) -> None:
         """ Changes the output power level.
@@ -142,7 +177,7 @@ class HoymilesHmDtu:
 
         self.__radio.set_radiation(powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
 
-    def __TransmitPacket(self, channel : int, packet : bytearray | bytes) -> None:
+    def __SendPacket(self, channel : int, packet : bytearray | bytes) -> bool:
         """ Sends a package to the receiver.
 
         Args:
@@ -157,35 +192,70 @@ class HoymilesHmDtu:
         radio.listen = False
         radio.flush_rx()
         radio.channel = channel
-        radio.open_tx_pipe(self.__inverterRadioId)   # TODO: maybe reverse?!
+        radio.open_tx_pipe(b'\01' + self.__inverterRadioId) 
 
-        radio.write(packet)
+        success = radio.write(packet)
+        return success
     
-    def TestReceivePackets(self, channel : int, timeout : float) -> None:
+    def TestReceivePackets(self, channel : int, timeout_ms : int) -> None:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
         radio = self.__radio
 
+        radio.flush_tx()
         radio.channel = channel
         radio.listen = True
 
-        startTime = time.time()
-        while time.time() - startTime < timeout:
+        startTime = time.time_ns()
+        while (time.time_ns() - startTime) / 1000000 < timeout_ms:
             
             isDataAvailable, pipeNum = radio.available_pipe()
+
+            if isDataAvailable:
+                print("data available")
+
             if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
                 continue
-
+            
             packetLength = radio.get_dynamic_payload_size()
             packet = radio.read(packetLength)
 
-            print(f"packet received, len = {len(packet)}")
+            print(f"***** packet received on channel {channel}: len = {len(packet)} *****")
+            str = " ".join(textwrap.wrap(packet.hex(), 2))
+            print(f"   {str}")
 
 
         radio.listen = False
 
-        
+    def TestComm(self) -> None:
+
+        try:
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
+
+            payload = self.__CreatePayloadFromTime(time.time())
+            packet = self.__CreatePacket(InverterRequest.INFO, InverterFrame.ALL_FRAMES, payload)
+
+            txChannel = 3
+            print(f"tx channel {txChannel}")
+
+            rxChannelList = InverterChannels.RF_CHANNELS.copy()
+            rxChannelList.remove(txChannel)
+
+            for _ in range(1000):
+                # listen for response
+                for rxChannel in rxChannelList:
+                    # send request
+                    print(f"    tx channel {txChannel}")
+                    if self.__SendPacket(txChannel, packet):
+                        print("SEND SUCCESS")
+                    
+                    print(f"    rx channel {rxChannel}")
+                    self.TestReceivePackets(rxChannel, 100)
+
+        finally:
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
+
 
     def __ReceivePackets(self, channel : int, packetsToReceive : list[int]) -> dict[int, bytearray]:
         """ Receives a list of packets. 
@@ -255,7 +325,7 @@ class HoymilesHmDtu:
         
         return payload
     
-    def __CreatePacketHeader(self, command : InverterCmd, frame : InverterFrame) -> bytearray:
+    def __CreatePacketHeader(self, command : InverterRequest, frame : InverterFrame) -> bytearray:
         """ Creates the packet header.
 
         Args:
@@ -277,7 +347,7 @@ class HoymilesHmDtu:
         
         return header
     
-    def __CreatePacket(self, command : InverterCmd, frame : InverterFrame, payload : bytes | bytearray | None) -> bytearray:
+    def __CreatePacket(self, command : InverterRequest, frame : InverterFrame, payload : bytes | bytearray | None) -> bytearray:
         """ Creates the packet.
             A paket is used for communication between the DTU (this device) and the inverter.
 
@@ -373,7 +443,7 @@ class HoymilesHmDtu:
         """
         serialNumberStr = inverterSerialNumber[4:]
         serialNumber = bytearray.fromhex(serialNumberStr)
-        serialNumber.reverse()
+        # serialNumber.reverse()
 
         return bytes(serialNumber)
 
@@ -386,21 +456,36 @@ class HoymilesHmDtu:
             bytes: The DTU radio ID.
         """
 
-        u = uuid.uuid1().int
+        # u = uuid.uuid1().int
 
-        id = 0x81000001
-        id |= (u % 10) << 4
-        id |= ((u // 10) % 10) << 8
-        id |= ((u // 100) % 10) << 12
-        id |= ((u // 1000) % 10) << 16
-        id |= ((u // 10000) % 10) << 20
+        # id = 0x81000000
+        # id |= (u % 10) << 4
+        # id |= ((u // 10) % 10) << 8
+        # id |= ((u // 100) % 10) << 12
+        # id |= ((u // 1000) % 10) << 16
+        # id |= ((u // 10000) % 10) << 20
 
-        return id.to_bytes(4, "big", signed=False)
+        # return id.to_bytes(4, "big", signed=False)
+
+        return bytes([0x78, 0x56, 0x30, 0x01])
+
+def DecodeResponse(data : bytes | bytearray) -> None:
+    print(f"response: ")
 
 if __name__ == "__main__":
 
-    hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
-    hm.InitializeCommunication()
-    hm.PrintNrf24l01Info()
+    # hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
 
-        
+    # hm.InitializeCommunication()
+    # # hm.PrintNrf24l01Info()
+    # hm.TestComm()
+
+    with open("responses.txt", "r") as f:
+        lines = f.readlines()
+
+    for line in lines:
+        if len(line.strip()) == 0:
+            continue
+
+        response = bytes.fromhex(line)
+        DecodeResponse(response)
