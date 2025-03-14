@@ -30,69 +30,7 @@ import MyCrc as crc
 import time
 import uuid
 import textwrap
-from enum import Enum, IntEnum
-
-class InverterType(Enum):
-    """ Inverter types = number of channels = number of solar panels per inverter.
-    """
-    InverterOneChannel = 1
-    InverterTwoChannels = 2
-    InverterFourChannels = 4
-
-class InverterRequest(IntEnum):
-    """ Inverter remote command definitions.
-    """
-
-    VERSION = 0x0F
-    INFO = 0x15
-    DEVIVE_CONTROL = 0x51
-
-    @staticmethod
-    def ToString(request : int) -> str:
-        match request:
-            case InverterRequest.VERSION:
-                return "VERSION"
-            case InverterRequest.INFO:
-                return "INFO"
-            case InverterRequest.DEVIVE_CONTROL:
-                return "DEVIVE_CONTROL"
-            case _:
-                return "???"
-
-class InverterResponse(IntEnum):
-    """ Inverter remote answer definitions.
-    """
-
-    VERSION = InverterRequest.VERSION | 0x80
-    INFO = InverterRequest.INFO | 0x80
-    DEVIVE_CONTROL = InverterRequest.DEVIVE_CONTROL | 0x80
-
-    @staticmethod
-    def ToString(response : int) -> str:
-        match response:
-            case InverterResponse.VERSION:
-                return "VERSION"
-            case InverterResponse.INFO:
-                return "INFO"
-            case InverterResponse.DEVIVE_CONTROL:
-                return "DEVIVE_CONTROL"
-            case _:
-                return "???"
-
-class InverterFrame(IntEnum):
-    """ Packet numbering. (???)
-    """
-    ALL_FRAMES = 0x80
-    SINGLE_FRAME = 0x81
-
-class InverterChannels:
-    """ Inverter RF channel definitions.
-
-        RF channel frequency: F0= 2400 + RF_CH [MHz]
-    """
-
-    # RF channels: send request on one channel, listen for resposne on all other channels
-    RF_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
+import HoymilesDefinitions as hoyDef
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
@@ -104,10 +42,12 @@ class HoymilesHmDtu:
     __MAX_PACKET_SIZE = 32
 
     __dtuRadioId : bytes
+    __dtuRadioAddress : bytes
 
     __inverterSerialNumber : str
     __inverterRadioId : bytes
-    __inverterType : InverterType
+    __inverterRadioAddress : bytes
+    __inverterType : hoyDef.InverterType
 
     __pinCsn : int
     __pinCe : int
@@ -134,10 +74,13 @@ class HoymilesHmDtu:
         self.__spiFrequency = spiFrequency
 
         self.__dtuRadioId = HoymilesHmDtu.__GenerateDtuRadioId()
+        self.__dtuRadioAddress = b'\01' + self.__dtuRadioId
+
         self.__inverterRadioId = HoymilesHmDtu.__GetInverterRadioId(self.__inverterSerialNumber)
+        self.__inverterRadioAddress = b'\01' + self.__inverterRadioId
 
         self.__inverterType = HoymilesHmDtu.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
-        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponsePacketTypesFromInverterType(self.__inverterType)
+        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponseFramesFromInverterType(self.__inverterType)
         
     def InitializeCommunication(self) -> None:
         """ Initializes the NRF24L01 communication.
@@ -154,7 +97,7 @@ class HoymilesHmDtu:
         radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
         radio.address_width = 5
 
-        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, b'\01' + self.__dtuRadioId) 
+        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioAddress) 
 
         self.__radio = radio
 
@@ -187,12 +130,16 @@ class HoymilesHmDtu:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
+        # ATTENTION: the data to be sent must not contain the control bytes 0x7D, 0x7E, 0x7F
+        if (0x7D in packet) or (0x7D in packet) or (0x7D in packet):
+            raise Exception("the data to be sent must not contain the control bytes 0x7D, 0x7E, 0x7F")
+        
         radio = self.__radio
 
         radio.listen = False
         radio.flush_rx()
         radio.channel = channel
-        radio.open_tx_pipe(b'\01' + self.__inverterRadioId) 
+        radio.open_tx_pipe(self.__inverterRadioAddress) 
 
         success = radio.write(packet)
         return success
@@ -234,12 +181,12 @@ class HoymilesHmDtu:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
 
             payload = self.__CreatePayloadFromTime(time.time())
-            packet = self.__CreatePacket(InverterRequest.INFO, InverterFrame.ALL_FRAMES, payload)
+            packet = self.__CreatePacket(hoyDef.Request.INFO, 1 | hoyDef.IS_LAST_FRAME, payload)
 
             txChannel = 3
             print(f"tx channel {txChannel}")
 
-            rxChannelList = InverterChannels.RF_CHANNELS.copy()
+            rxChannelList = hoyDef.RF_CHANNELS.copy()
             rxChannelList.remove(txChannel)
 
             for _ in range(1000):
@@ -270,8 +217,10 @@ class HoymilesHmDtu:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
         
-        self.__radio.channel = channel
-        self.__radio.listen = True
+        radio = self.__radio
+
+        radio.channel = channel
+        radio.listen = True
 
         remainingPacketsToReceive = packetsToReceive.copy()
         receivedPackets : dict[int, bytearray] = {}
@@ -282,20 +231,19 @@ class HoymilesHmDtu:
             if not self.__radio.available():
                 continue
             
-            buffer = self.__radio.read(32)
+            packetLength = radio.get_dynamic_payload_size()
+            packet = radio.read(packetLength)
 
             # ignore data if CRC error
-            checksum1 = crc.CalculateHoymilesCrc8(buffer, 26)
-            checksum2 = buffer[26]
-            if checksum1 != checksum2:
+            if not HoymilesHmDtu.CheckChecksum(packet):
                 continue
 
-            receivedPacketType = buffer[9]
+            receivedPacketType = packet[9]
 
             if receivedPacketType in remainingPacketsToReceive:
                 remainingPacketsToReceive.remove(receivedPacketType)
 
-                receivedPacketData = buffer[10:26]
+                receivedPacketData = packet[10:]
                 receivedPackets[receivedPacketType] = receivedPacketData
 
                 if len(remainingPacketsToReceive):
@@ -325,12 +273,12 @@ class HoymilesHmDtu:
         
         return payload
     
-    def __CreatePacketHeader(self, command : InverterRequest, frame : InverterFrame) -> bytearray:
+    def __CreatePacketHeader(self, command : hoyDef.Request, frameNumber : int) -> bytearray:
         """ Creates the packet header.
 
         Args:
             command (InverterCmd): The packet command.
-            frame (InverterFrame): The packet frame.
+            frameNumber (int): The packet frame number (1, 2, ...). Last frame number must be ored with 0x80 = IS_LAST_FRAME.
 
         Returns:
             bytearray: The packet header.
@@ -340,27 +288,27 @@ class HoymilesHmDtu:
         header[0] = command
         header[1:5] = self.__inverterRadioId
         header[5:9] = self.__dtuRadioId
-        header[9] = frame
+        header[9] = frameNumber
         
         if len(header) != 10:
             raise Exception(f"Internal error __CreatePacketHeader: size {len(header)} != 10")
         
         return header
     
-    def __CreatePacket(self, command : InverterRequest, frame : InverterFrame, payload : bytes | bytearray | None) -> bytearray:
+    def __CreatePacket(self, command : hoyDef.Request, frameNumber : int, payload : bytes | bytearray | None) -> bytearray:
         """ Creates the packet.
             A paket is used for communication between the DTU (this device) and the inverter.
 
         Args:
             command (InverterCmd): The packet command.
-            frame (InverterFrame): The packet frame.
+            frameNumber (int): The packet frame number (1, 2, ...). Last frame number must be ored with 0x80 = IS_LAST_FRAME.
             payload (bytes | bytearray | None): The payload to be sent.
 
         Returns:
             bytearray: The packet.
         """
 
-        packet = self.__CreatePacketHeader(command, frame)
+        packet = self.__CreatePacketHeader(command, frameNumber)
 
         if (payload is not None) and (len(payload) > 0):
             packet.extend(payload)
@@ -385,7 +333,7 @@ class HoymilesHmDtu:
         self.__radio.print_pretty_details()
 
     @staticmethod
-    def __GetInverterTypeFromSerialNumber(inverterSerialNumber : str) -> InverterType:
+    def __GetInverterTypeFromSerialNumber(inverterSerialNumber : str) -> hoyDef.InverterType:
         """ Determines the inverter type from serial number.
 
         Args:
@@ -398,11 +346,11 @@ class HoymilesHmDtu:
             case "10" | "11":
                 match inverterSerialNumber[2:4]:
                     case "21" | "22" | "24":
-                        return InverterType.InverterOneChannel
+                        return hoyDef.InverterType.InverterOneChannel
                     case "41" | "42" | "44":
-                        return InverterType.InverterTwoChannels
+                        return hoyDef.InverterType.InverterTwoChannels
                     case "61" | "62" | "64":
-                        return InverterType.InverterFourChannels
+                        return hoyDef.InverterType.InverterFourChannels
                     case _:
                         pass
             case _:
@@ -411,8 +359,8 @@ class HoymilesHmDtu:
         raise Exception(f"Inverter type with serial number {inverterSerialNumber} is not supported.")
 
     @staticmethod
-    def __GetResponsePacketTypesFromInverterType(inverterType : InverterType) -> list[int]:
-        """ Returns a list of the packet types that the inverter will send if data is querried.
+    def __GetResponseFramesFromInverterType(inverterType : hoyDef.InverterType) -> list[int]:
+        """ Returns a list of the frames that the inverter will send if data is querried.
 
         Args:
             inverterType (InverterType): The type of the inverter.
@@ -420,13 +368,16 @@ class HoymilesHmDtu:
         Returns:
             list[int]: List of packet types for a response on a data query.
         """
+
+        # hint: 0x80 indicates that it is the last frame
+
         match inverterType:
-            case InverterType.InverterOneChannel:
-                return [ 0x01, 0x82 ]
-            case InverterType.InverterTwoChannels:
-                return [ 0x01, 0x02, 0x83 ]
-            case InverterType.InverterFourChannels:
-                return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]
+            case hoyDef.InverterType.InverterOneChannel:
+                return [ 0x01, 0x82 ]                       # inverter sends 2 frames
+            case hoyDef.InverterType.InverterTwoChannels:
+                return [ 0x01, 0x02, 0x83 ]                 # inverter sends 3 frames
+            case hoyDef.InverterType.InverterFourChannels:
+                return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]     # inverter sends 5 frames
             case _:
                 raise Exception(f"Unsupported inverter type {inverterType}")
 
@@ -469,23 +420,25 @@ class HoymilesHmDtu:
 
         return bytes([0x78, 0x56, 0x30, 0x01])
 
-def DecodeResponse(data : bytes | bytearray) -> None:
-    print(f"response: ")
+    @staticmethod
+    def CheckChecksum(packet : bytes | bytearray) -> bool:
+        """ Checks the checksum of a packet.
 
+        Args:
+            packet (bytes | bytearray): The packet to be checked.
+
+        Returns:
+            bool: True if the checksum is valid.
+        """
+        checksum1 = crc.CalculateHoymilesCrc8(packet, len(packet) - 1)
+        checksum2 = packet[-1]
+        return checksum1 == checksum2
+        
 if __name__ == "__main__":
 
-    # hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
+    hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
 
-    # hm.InitializeCommunication()
-    # # hm.PrintNrf24l01Info()
-    # hm.TestComm()
+    hm.InitializeCommunication()
+    hm.PrintNrf24l01Info()
+    hm.TestComm()
 
-    with open("responses.txt", "r") as f:
-        lines = f.readlines()
-
-    for line in lines:
-        if len(line.strip()) == 0:
-            continue
-
-        response = bytes.fromhex(line)
-        DecodeResponse(response)
