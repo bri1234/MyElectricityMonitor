@@ -134,11 +134,11 @@ class HoymilesHmDtu:
         success = radio.write(packet)
         return success
 
-    def TestReceivePackets(self, channel : int, timeout_ms : int) -> bool:
+    def TestReceivePackets(self, channel : int, timeout_ms : int) -> int:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
-        responseReceived = False
+        responseReceived = 0
 
         radio = self.__radio
 
@@ -160,12 +160,11 @@ class HoymilesHmDtu:
             packetLength = radio.get_dynamic_payload_size()
             packet = radio.read(packetLength)
 
-            responseReceived = True
+            responseReceived += 1
 
-            print(f"    packet received on channel {channel}: len = {len(packet)} frame number: ${packet[9]:02X}", flush=True)
+            #print(f"    packet received: ch={channel} len={len(packet)} frame=${packet[9]:02X}", flush=True)
             # str = " ".join(textwrap.wrap(packet.hex(), 2))
             # print(f"   {str}")
-
 
         radio.listen = False
 
@@ -186,14 +185,13 @@ class HoymilesHmDtu:
                     if txChannel == rxChannel:
                         continue
 
-                    print(f"TX {txChannel}")
+                    print(f"TX {txChannel} RX {rxChannel}")
                     responseReceived = False
 
                     for _ in range(50):
                         time.sleep(2)
 
-                        success = self.__SendPacket(txChannel, packet)
-                        print(f"        send {success}")
+                        self.__SendPacket(txChannel, packet)
 
                         if self.TestReceivePackets(rxChannel, 200):
                             responseReceived = True

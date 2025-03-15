@@ -27,6 +27,8 @@ IN THE SOFTWARE.
 
 import MyCrc as crc
 
+#--------------------------------------------------------------------------------------------------
+
 REQUEST_RF_VERSION = 0x06
 ANSWER_RF_VERSION = REQUEST_RF_VERSION | 0x80
 
@@ -34,6 +36,28 @@ REQUEST_INFO = 0x15
 ANSWER_INFO = REQUEST_INFO | 0x80
 
 __MAX_PACKET_SIZE = 32
+
+#--------------------------------------------------------------------------------------------------
+
+TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
+
+RX_CHANNELS_REQUEST_RF_VERSION :dict[ int, list[int] ] = {
+    3  : [23],
+    23 : [40],
+    40 : [61],
+    61 : [75],
+    75 : [ 3]
+}
+
+RX_CHANNELS_REQUEST_INFO : dict[ int, list[int] ] = {
+    3  : [23, 40, 61],
+    23 : [40, 61, 75],
+    40 : [61, 75,  3],
+    61 : [75,  3, 23], 
+    75 : [ 3, 23, 40]
+}
+
+#--------------------------------------------------------------------------------------------------
 
 def CreateRequestInfoPacket(receiverAddr : bytes, senderAddr : bytes, currentTime : float) -> bytearray:
     """ Creates the packet that can be sent to the inverter to request information.
