@@ -120,7 +120,10 @@ def CreatePacketHeader(command : hd.Request, receiverAddr : bytes, senderAddr : 
     header[9] = packetNumber
     
     if isLastPacket:
-        header[9] |= 0x80
+        if packetNumber == 1:
+            header[9] = 0x80
+        else:
+            header[9] |= 0x80
 
     if len(header) != 10:
         raise Exception(f"Internal error CreatePacketHeader: size {len(header)} != 10")

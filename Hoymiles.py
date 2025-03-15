@@ -131,9 +131,8 @@ class HoymilesHmDtu:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
-        # attention: the data to be sent must not contain the control bytes 0x7D, 0x7E, 0x7F
-        if (0x7D in packet) or (0x7D in packet) or (0x7D in packet):
-            raise Exception("the data to be sent must not contain the control bytes 0x7D, 0x7E, 0x7F")
+        if (0x7E in packet) or (0x7F in packet):
+            raise Exception("the data to be sent must not contain the control bytes 0x7E, 0x7F")
 
         radio = self.__radio
 
@@ -186,9 +185,10 @@ class HoymilesHmDtu:
         try:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
 
-            # packet = hmd.CreatePacketList(hd.Request.RF_VERSION, self.__inverterRadioId, self.__dtuRadioId, None)
-            data = hmd.CreateDataFromTime(time.time())
-            packets = hmd.CreatePacketList(hd.Request.INFO, self.__inverterRadioId, self.__dtuRadioId, data)
+            packets = hmd.CreatePacketList(hd.Request.RF_VERSION, self.__inverterRadioId, self.__dtuRadioId, None)
+            # data = hmd.CreateDataFromTime(time.time())
+            # packets = hmd.CreatePacketList(hd.Request.INFO, self.__inverterRadioId, self.__dtuRadioId, data)
+
             if len(packets) != 1:
                 raise Exception("packet problem")
             
@@ -200,19 +200,19 @@ class HoymilesHmDtu:
                     if txChannel == rxChannel:
                         continue
 
+                    print(f"TX {txChannel}")
                     responseReceived = False
 
-                    for _ in range(20):
-                        time.sleep(1)
+                    for _ in range(50):
+                        time.sleep(2)
 
-                        if self.__SendPacket(txChannel, packets[0]):
-                            print("SEND SUCCESS")
+                        success = self.__SendPacket(txChannel, packets[0])
+                        print(f"        send {success}")
 
-                        if self.TestReceivePackets(rxChannel, 100):
+                        if self.TestReceivePackets(rxChannel, 200):
                             responseReceived = True
-                            break
 
-                    print(f"TX {txChannel} RX {rxChannel} Response {responseReceived}", flush=True)
+                    print(f"    TX {txChannel} RX {rxChannel} Response {responseReceived}", flush=True)
 
         finally:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
