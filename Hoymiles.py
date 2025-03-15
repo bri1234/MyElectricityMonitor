@@ -28,9 +28,8 @@ IN THE SOFTWARE.
 import pyrf24 as nrf
 import MyCrc as crc
 import time
-import uuid
-import textwrap
-import HoymilesDefinitions as hd
+#import uuid
+#import textwrap
 import HoymilesMessageData as hmd
 
 class HoymilesHmDtu:
@@ -47,7 +46,7 @@ class HoymilesHmDtu:
     __inverterSerialNumber : str
     __inverterRadioId : bytes
     __inverterRadioAddress : bytes
-    __inverterType : hd.InverterType
+    __inverterNumberOfChannels : int
 
     __pinCsn : int
     __pinCe : int
@@ -79,8 +78,8 @@ class HoymilesHmDtu:
         self.__inverterRadioId = HoymilesHmDtu.__GetInverterRadioId(self.__inverterSerialNumber)
         self.__inverterRadioAddress = b'\01' + self.__inverterRadioId
 
-        self.__inverterType = HoymilesHmDtu.__GetInverterTypeFromSerialNumber(self.__inverterSerialNumber)
-        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponseFramesFromInverterType(self.__inverterType)
+        self.__inverterNumberOfChannels = HoymilesHmDtu.__GetInverterNumberOfChannels(self.__inverterSerialNumber)
+        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponseFramesFromInverterType(self.__inverterNumberOfChannels)
 
     def InitializeCommunication(self) -> None:
         """ Initializes the NRF24L01 communication.
@@ -101,14 +100,6 @@ class HoymilesHmDtu:
         radio.open_tx_pipe(self.__inverterRadioAddress)
 
         self.__radio = radio
-
-    # def QueryInformations(self, timeout : float = 3) -> None:
-
-    #     # create request info message
-    #     payloadCurrentTime = HoymilesHmDtu.__CreatePayloadFromTime(time.time())
-    #     packetRequestInfo = self.__CreatePacket(HoymilesHmDtu.__CMD_TX_REQ_INFO, payloadCurrentTime)
-
-    #     startTime = time.time()
 
     def __SetPowerLevel(self, powerLevel : nrf.rf24_pa_dbm_e) -> None:
         """ Changes the output power level.
@@ -185,15 +176,10 @@ class HoymilesHmDtu:
         try:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
 
-            packets = hmd.CreatePacketList(hd.Request.RF_VERSION, self.__inverterRadioId, self.__dtuRadioId, None)
-            # data = hmd.CreateDataFromTime(time.time())
-            # packets = hmd.CreatePacketList(hd.Request.INFO, self.__inverterRadioId, self.__dtuRadioId, data)
-
-            if len(packets) != 1:
-                raise Exception("packet problem")
+            packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
+            #packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
             
             channelList = [ 3, 23, 40, 61, 75 ]
-            #channelList = range(0, 128)
 
             for txChannel in channelList:
                 for rxChannel in channelList:
@@ -206,7 +192,7 @@ class HoymilesHmDtu:
                     for _ in range(50):
                         time.sleep(2)
 
-                        success = self.__SendPacket(txChannel, packets[0])
+                        success = self.__SendPacket(txChannel, packet)
                         print(f"        send {success}")
 
                         if self.TestReceivePackets(rxChannel, 200):
@@ -218,54 +204,6 @@ class HoymilesHmDtu:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
 
 
-    def __ReceivePackets(self, channel : int, packetsToReceive : list[int]) -> dict[int, bytearray]:
-        """ Receives a list of packets.
-
-        Args:
-            channel (int): The channel where to listen.
-            packetsToReceive (list[int]): List of type of packets to receive.
-
-        Returns:
-            dict[int, bytearray]: Received packets. (Can be less then requested number of packets.)
-        """
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
-
-        radio = self.__radio
-
-        radio.channel = channel
-        radio.listen = True
-
-        remainingPacketsToReceive = packetsToReceive.copy()
-        receivedPackets : dict[int, bytearray] = {}
-        startTime = time.time_ns()
-
-        while time.time_ns() - startTime  < HoymilesHmDtu.__RX_PACKET_TIMEOUT_NS:
-
-            if not self.__radio.available():
-                continue
-
-            packetLength = radio.get_dynamic_payload_size()
-            packet = radio.read(packetLength)
-
-            # ignore data if CRC error
-            if not HoymilesHmDtu.CheckChecksum(packet):
-                continue
-
-            receivedPacketType = packet[9]
-
-            if receivedPacketType in remainingPacketsToReceive:
-                remainingPacketsToReceive.remove(receivedPacketType)
-
-                receivedPacketData = packet[10:]
-                receivedPackets[receivedPacketType] = receivedPacketData
-
-                if len(remainingPacketsToReceive):
-                    break
-
-        return receivedPackets
-
-
     def PrintNrf24l01Info(self) -> None:
         """ Prints NRF24L01 module information on standard output.
         """
@@ -275,7 +213,7 @@ class HoymilesHmDtu:
         self.__radio.print_pretty_details()
 
     @staticmethod
-    def __GetInverterTypeFromSerialNumber(inverterSerialNumber : str) -> hd.InverterType:
+    def __GetInverterNumberOfChannels(inverterSerialNumber : str) -> int:
         """ Determines the inverter type from serial number.
 
         Args:
@@ -288,11 +226,11 @@ class HoymilesHmDtu:
             case "10" | "11":
                 match inverterSerialNumber[2:4]:
                     case "21" | "22" | "24":
-                        return hd.InverterType.InverterOneChannel
+                        return 1
                     case "41" | "42" | "44":
-                        return hd.InverterType.InverterTwoChannels
+                        return 2
                     case "61" | "62" | "64":
-                        return hd.InverterType.InverterFourChannels
+                        return 4
                     case _:
                         pass
             case _:
@@ -301,27 +239,27 @@ class HoymilesHmDtu:
         raise Exception(f"Inverter type with serial number {inverterSerialNumber} is not supported.")
 
     @staticmethod
-    def __GetResponseFramesFromInverterType(inverterType : hd.InverterType) -> list[int]:
+    def __GetResponseFramesFromInverterType(inverterNumberOfChannels : int) -> list[int]:
         """ Returns a list of the frames that the inverter will send if data is querried.
 
         Args:
-            inverterType (InverterType): The type of the inverter.
+            inverterNumberOfChannels (int): The type of the inverter.
 
         Returns:
             list[int]: List of packet types for a response on a data query.
         """
 
-        # hint: 0x80 indicates that it is the last frame
+        # 0x80 indicates that it is the last frame
 
-        match inverterType:
-            case hd.InverterType.InverterOneChannel:
+        match inverterNumberOfChannels:
+            case 1:
                 return [ 0x01, 0x82 ]                       # inverter sends 2 frames
-            case hd.InverterType.InverterTwoChannels:
+            case 2:
                 return [ 0x01, 0x02, 0x83 ]                 # inverter sends 3 frames
-            case hd.InverterType.InverterFourChannels:
+            case 4:
                 return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]     # inverter sends 5 frames
             case _:
-                raise Exception(f"Unsupported inverter type {inverterType}")
+                raise Exception(f"Unsupported inverter type {inverterNumberOfChannels}")
 
     @staticmethod
     def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
@@ -336,7 +274,6 @@ class HoymilesHmDtu:
         """
         serialNumberStr = inverterSerialNumber[4:]
         serialNumber = bytearray.fromhex(serialNumberStr)
-        # serialNumber.reverse()
 
         return bytes(serialNumber)
 

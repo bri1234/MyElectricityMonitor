@@ -25,7 +25,6 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 """
 
-import HoymilesDefinitions as hd
 import Hoymiles as hoy
 import textwrap
 import MyCrc as crc
@@ -36,7 +35,7 @@ def DecodeResponse(packet : bytes | bytearray) -> None:
 
     print("------------------------------------------------------------------------------------")
     response = packet[0]
-    print(f"response: ${response:02X} {hd.Response.ToString(response)}")
+    print(f"response: ${response:02X}")
 
     print(f"checksum: {hoy.HoymilesHmDtu.CheckChecksum(packet)}")
 
