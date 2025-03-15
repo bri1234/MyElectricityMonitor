@@ -39,7 +39,6 @@ class HoymilesHmDtu:
 
     __RX_PIPE = 1
     __RX_PACKET_TIMEOUT_NS = 10_000_000
-    __MAX_PACKET_SIZE = 32
 
     __dtuRadioId : bytes
     __dtuRadioAddress : bytes
@@ -251,78 +250,6 @@ class HoymilesHmDtu:
 
         return receivedPackets
     
-    @staticmethod
-    def __CreatePayloadFromTime(currentTime : float) -> bytearray:
-        """ Creates payload data filled with the time.
-
-        Args:
-            currentTime (float): The current time.
-
-        Returns:
-            bytearray: The payload data.
-        """
-        payload = bytearray(14)
-
-        payload[0] = 0x0B
-        payload[1] = 0x00
-        payload[2:6] = int(currentTime).to_bytes(4, "big", signed = False)
-        payload[9] = 0x05
-
-        if len(payload) != 14:
-            raise Exception(f"Internal error __CreatePayloadFromTime: size {len(payload)} != 14")
-        
-        return payload
-    
-    def __CreatePacketHeader(self, command : hoyDef.Request, frameNumber : int) -> bytearray:
-        """ Creates the packet header.
-
-        Args:
-            command (InverterCmd): The packet command.
-            frameNumber (int): The packet frame number (1, 2, ...). Last frame number must be ored with 0x80 = IS_LAST_FRAME.
-
-        Returns:
-            bytearray: The packet header.
-        """
-        header = bytearray(10)
-
-        header[0] = command
-        header[1:5] = self.__inverterRadioId
-        header[5:9] = self.__dtuRadioId
-        header[9] = frameNumber
-        
-        if len(header) != 10:
-            raise Exception(f"Internal error __CreatePacketHeader: size {len(header)} != 10")
-        
-        return header
-    
-    def __CreatePacket(self, command : hoyDef.Request, frameNumber : int, payload : bytes | bytearray | None) -> bytearray:
-        """ Creates the packet.
-            A paket is used for communication between the DTU (this device) and the inverter.
-
-        Args:
-            command (InverterCmd): The packet command.
-            frameNumber (int): The packet frame number (1, 2, ...). Last frame number must be ored with 0x80 = IS_LAST_FRAME.
-            payload (bytes | bytearray | None): The payload to be sent.
-
-        Returns:
-            bytearray: The packet.
-        """
-
-        packet = self.__CreatePacketHeader(command, frameNumber)
-
-        if (payload is not None) and (len(payload) > 0):
-            packet.extend(payload)
-
-            crc16 = crc.CalculateHoymilesCrc16(payload, len(payload))
-            packet.extend(crc16.to_bytes(2, "big", signed=False))
-
-        crc8 = crc.CalculateHoymilesCrc8(packet, len(packet))
-        packet.extend(crc8.to_bytes(1, "big", signed=False))
-
-        if len(packet) > HoymilesHmDtu.__MAX_PACKET_SIZE:
-            raise Exception(f"Internal error __CreatePacket: packet size ({len(packet)}) > MAX_PACKET_SIZE ({HoymilesHmDtu.__MAX_PACKET_SIZE})")
-        
-        return packet
     
     def PrintNrf24l01Info(self) -> None:
         """ Prints NRF24L01 module information on standard output.

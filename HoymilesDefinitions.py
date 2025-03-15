@@ -38,6 +38,7 @@ class Request(IntEnum):
     """ Inverter remote command definitions.
     """
 
+    RF_VERSION = 0x06
     VERSION = 0x0F
     INFO = 0x15
     DEVIVE_CONTROL = 0x51
@@ -45,6 +46,8 @@ class Request(IntEnum):
     @staticmethod
     def ToString(request : int) -> str:
         match request:
+            case Request.RF_VERSION:
+                return "RF_VERSION"
             case Request.VERSION:
                 return "VERSION"
             case Request.INFO:
@@ -58,6 +61,7 @@ class Response(IntEnum):
     """ Inverter remote answer definitions.
     """
 
+    RF_VERSION = Request.RF_VERSION | 0x80
     VERSION = Request.VERSION | 0x80
     INFO = Request.INFO | 0x80
     DEVIVE_CONTROL = Request.DEVIVE_CONTROL | 0x80
@@ -65,6 +69,8 @@ class Response(IntEnum):
     @staticmethod
     def ToString(response : int) -> str:
         match response:
+            case Response.RF_VERSION:
+                return "RF_VERSION"
             case Response.VERSION:
                 return "VERSION"
             case Response.INFO:
