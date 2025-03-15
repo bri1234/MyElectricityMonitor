@@ -127,7 +127,7 @@ def CreatePacketHeader(command : hd.Request, receiverAddr : bytes, senderAddr : 
     
     return header
 
-def CreatePayloadFromTime(currentTime : float) -> bytearray:
+def CreateDataFromTime(currentTime : float) -> bytearray:
     """ Creates payload data filled with the time.
 
     Args:
@@ -149,10 +149,62 @@ def CreatePayloadFromTime(currentTime : float) -> bytearray:
     return payload
 
 def EscapeData(input : bytes | bytearray) -> bytearray:
-    output = bytearray(input)
+    """ Replaces bytes with special meaning by escape sequences.
+        0x7D -> 0x7D 0x5D
+        0x7E -> 0x7D 0x5E
+        0x7F -> 0x7D 0x5F
+
+    Args:
+        input (bytes | bytearray): The input data.
+
+    Returns:
+        bytearray: The escaped output data.
+    """
+    output = bytearray()
+
+    for b in input:
+        match b:
+            case 0x7D:
+                output.append(0x7D)
+                output.append(0x5D)
+            case 0x7E:
+                output.append(0x7D)
+                output.append(0x5E)
+            case 0x7F:
+                output.append(0x7D)
+                output.append(0x5F)
+            case _:
+                output.append(b)
+
     return output
 
 def UnescapeData(input : bytes | bytearray) -> bytearray:
-    output = bytearray(input)
+    """ Undo replace of bytes with special meaning by escape sequences.
+
+    Args:
+        input (bytes | bytearray): The input data.
+
+    Returns:
+        bytearray: The output data without escaped bytes.
+    """
+    output = bytearray()
+
+    for idx in range(len(input)):
+        b = input[idx]
+
+        if b == 0x7D:
+            idx += 1
+            match input[idx]:
+                case 0x5D:
+                    output.append(0x7D)
+                case 0x5E:
+                    output.append(0x7E)
+                case 0x5F:
+                    output.append(0x7F)
+                case _:
+                    raise Exception("UnescapeData(): Invalid data, can not decode.")
+        else:
+            output.append(b)
+
     return output
 

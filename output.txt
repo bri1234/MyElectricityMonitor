@@ -1,0 +1,14 @@
+***** packet received on channel 23: len = 25 *****
+TX 3 RX 23 Response True
+TX 3 RX 40 Response False
+TX 3 RX 61 Response False
+TX 3 RX 75 Response False
+TX 23 RX 3 Response False
+TX 23 RX 40 Response False
+TX 23 RX 61 Response False
+TX 23 RX 75 Response False
+TX 40 RX 3 Response False
+TX 40 RX 23 Response False
+TX 40 RX 61 Response False
+TX 40 RX 75 Response False
+TX 61 RX 3 Response False
