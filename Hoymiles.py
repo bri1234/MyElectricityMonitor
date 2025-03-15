@@ -188,8 +188,8 @@ class HoymilesHmDtu:
                     print(f"TX {txChannel} RX {rxChannel}")
                     responseReceived = False
 
-                    for _ in range(50):
-                        time.sleep(2)
+                    for _ in range(100):
+                        time.sleep(0.2)
 
                         self.__SendPacket(txChannel, packet)
 
