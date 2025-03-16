@@ -150,7 +150,7 @@ class HoymilesHmDtu:
 
             radio.listen = False
             radio.flush_rx()
-            radio.set_retries(3, 5) # not too many reties to listen fast enough on packet 1
+            radio.set_retries(3, 6) # not too many reties to listen fast enough on packet 1
             radio.channel = txChannel
 
             radio.write(txPacket)
@@ -202,7 +202,7 @@ class HoymilesHmDtu:
                     totalResponseReceived = 0
                     totalStatistic : dict[int, int] = { 0x01: 0, 0x02: 0, 0x83: 0 }
 
-                    for _ in range(100):
+                    for _ in range(200):
                         time.sleep(0.9)
                         
                         responseReceived, statistic = self.TestReceivePackets(txChannel, txPacket, rxChannel, 200)
