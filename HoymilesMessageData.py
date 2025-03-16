@@ -86,13 +86,13 @@ def CreateRequestInfoPacket(receiverAddr : bytes, senderAddr : bytes, currentTim
     packet.extend(packetChecksum.to_bytes(1, "big", signed=False))
 
     if len(packet) != 27:
-        raise Exception(f"Internal error __CreatePacket: packet size {len(packet)} != 27")
+        raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} != 27")
     
     # replace special characters
     packet = EscapeData(packet)
 
     if len(packet) > __MAX_PACKET_SIZE:
-        raise Exception(f"Internal error __CreatePacket: packet size {len(packet)} > MAX_PACKET_SIZE {__MAX_PACKET_SIZE}")
+        raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} > MAX_PACKET_SIZE {__MAX_PACKET_SIZE}")
     
     return packet
 
@@ -116,13 +116,13 @@ def CreateRfVersionPacket(receiverAddr : bytes, senderAddr : bytes) -> bytearray
     packet.extend(packetChecksum.to_bytes(1, "big", signed=False))
 
     if len(packet) != 11:
-        raise Exception(f"Internal error __CreatePacket: packet size {len(packet)} != 11")
+        raise Exception(f"Internal error CreateRfVersionPacket: packet size {len(packet)} != 11")
     
     # replace special characters
     packet = EscapeData(packet)
 
     if len(packet) > __MAX_PACKET_SIZE:
-        raise Exception(f"Internal error __CreatePacket: packet size {len(packet)} > MAX_PACKET_SIZE {__MAX_PACKET_SIZE}")
+        raise Exception(f"Internal error CreateRfVersionPacket: packet size {len(packet)} > MAX_PACKET_SIZE {__MAX_PACKET_SIZE}")
     
     return packet
 
@@ -152,7 +152,7 @@ def __CreatePacketHeader(command : int, receiverAddr : bytes, senderAddr : bytes
     header[9] = frame
     
     if len(header) != 10:
-        raise Exception(f"Internal error CreatePacketHeader: size {len(header)} != 10")
+        raise Exception(f"Internal error __CreatePacketHeader: size {len(header)} != 10")
     
     return header
 
@@ -173,7 +173,7 @@ def __CreateRequestInfoPayload(currentTime : float) -> bytearray:
     payload[9] = 0x05
 
     if len(payload) != 14:
-        raise Exception(f"Internal error __CreatePayloadFromTime: size {len(payload)} != 14")
+        raise Exception(f"Internal error __CreateRequestInfoPayload: size {len(payload)} != 14")
     
     return payload
 

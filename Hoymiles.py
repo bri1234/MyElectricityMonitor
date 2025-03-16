@@ -175,8 +175,8 @@ class HoymilesHmDtu:
         try:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
 
-            packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
-            #packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
+            #packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
+            packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
             
             channelList = [ 3, 23, 40, 61, 75 ]
 
@@ -185,18 +185,20 @@ class HoymilesHmDtu:
                     if txChannel == rxChannel:
                         continue
 
-                    print(f"TX {txChannel} RX {rxChannel}")
-                    responseReceived = False
+                    print(f"TX {txChannel} RX {rxChannel}", flush=True)
+                    totalResponseReceived = 0
 
                     for _ in range(100):
-                        time.sleep(0.2)
-
+                        time.sleep(0.9)
+                        
                         self.__SendPacket(txChannel, packet)
+                        responseReceived = self.TestReceivePackets(rxChannel, 200)
+                        totalResponseReceived += responseReceived
 
-                        if self.TestReceivePackets(rxChannel, 200):
-                            responseReceived = True
+                        print("." if responseReceived == 0 else "O", end="", flush=True)
 
-                    print(f"    TX {txChannel} RX {rxChannel} Response {responseReceived}", flush=True)
+                    print()
+                    print(f"    TX {txChannel} RX {rxChannel} Response {totalResponseReceived}", flush=True)
 
         finally:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
@@ -316,6 +318,6 @@ if __name__ == "__main__":
     hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
 
     hm.InitializeCommunication()
-    # hm.PrintNrf24l01Info()
+    hm.PrintNrf24l01Info()
     hm.TestComm()
 
