@@ -41,20 +41,20 @@ __MAX_PACKET_SIZE = 32
 
 TX_CHANNELS : list[int] = [ 3, 23, 40, 61, 75 ]
 
-RX_CHANNELS_REQUEST_RF_VERSION :dict[ int, list[int] ] = {
-    3  : [23],
-    23 : [40],
-    40 : [61],
-    61 : [75],
-    75 : [ 3]
+RX_CHANNELS_REQUEST_RF_VERSION :dict[ int, int ] = {
+    3  : 23,
+    23 : 40,
+    40 : 61,
+    61 : 75,
+    75 :  3
 }
 
 RX_CHANNELS_REQUEST_INFO : dict[ int, list[int] ] = {
-    3  : [23, 40, 61],
-    23 : [40, 61, 75],
-    40 : [61, 75,  3],
-    61 : [75,  3, 23], 
-    75 : [ 3, 23, 40]
+    3  : [23, 40, 61],  # main channel: 40
+    23 : [40, 61, 75],  # main channel: 61
+    40 : [61, 75,  3],  # main channel: 75
+    61 : [75,  3, 23],  # main channel: 3
+    75 : [ 3, 23, 40]   # main channel: 23
 }
 
 #--------------------------------------------------------------------------------------------------

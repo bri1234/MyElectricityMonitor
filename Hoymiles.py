@@ -28,9 +28,10 @@ IN THE SOFTWARE.
 import pyrf24 as nrf
 import MyCrc as crc
 import time
-#import uuid
+import uuid
 #import textwrap
 import HoymilesMessageData as hmd
+import gc
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
@@ -90,7 +91,7 @@ class HoymilesHmDtu:
             raise Exception("Can not initialize RF24!")
 
         radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_LOW, nrf.rf24_datarate_e.RF24_250KBPS)
-        radio.set_retries(10, 15)
+        radio.set_retries(3, 15)
         radio.dynamic_payloads = True
         radio.set_auto_ack(HoymilesHmDtu.__RX_PIPE, True)
         radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
@@ -134,49 +135,61 @@ class HoymilesHmDtu:
         success = radio.write(packet)
         return success
 
-    def TestReceivePackets(self, channel : int, timeout_ms : int) -> int:
+    def TestReceivePackets(self, txChannel : int, txPacket : bytearray, rxChannel : int, timeout_ms : int) -> tuple[int, dict[int, int]]:
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
 
-        responseReceived = 0
+        try:
+            gc.disable()
+            responseReceived = 0
 
-        radio = self.__radio
+            radio = self.__radio
 
-        radio.flush_tx()
-        radio.channel = channel
-        radio.listen = True
+            statistic : dict[int, int] = { 0x01: 0, 0x02: 0, 0x83: 0 }
+            endTime = time.time_ns() + timeout_ms * 1000000
 
-        startTime = time.time_ns()
-        while (time.time_ns() - startTime) / 1000000 < timeout_ms:
+            radio.listen = False
+            radio.flush_rx()
+            radio.set_retries(3, 5) # not too many reties to listen fast enough on packet 1
+            radio.channel = txChannel
 
-            isDataAvailable, pipeNum = radio.available_pipe()
+            radio.write(txPacket)
 
-            # if isDataAvailable:
-            #     print("data available")
+            # radio.flush_tx()
+            radio.channel = rxChannel
+            radio.listen = True
 
-            if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
-                continue
+            while time.time_ns() < endTime:
 
-            packetLength = radio.get_dynamic_payload_size()
-            packet = radio.read(packetLength)
+                isDataAvailable, pipeNum = radio.available_pipe()
+                if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
+                    continue
 
-            responseReceived += 1
+                # TODO: check target radio ID
 
-            #print(f"    packet received: ch={channel} len={len(packet)} frame=${packet[9]:02X}", flush=True)
-            # str = " ".join(textwrap.wrap(packet.hex(), 2))
-            # print(f"   {str}")
+                packetLength = radio.get_dynamic_payload_size()
+                packet = radio.read(packetLength)
+                frameNum = packet[9]
 
-        radio.listen = False
+                responseReceived += 1
+                statistic[frameNum] += 1
 
-        return responseReceived
+                # print(f"    rx: frame=${frameNum:02X} ch={channel} ", flush=True)
+
+            radio.listen = False
+
+            return responseReceived, statistic
+        finally:
+            gc.enable()
 
     def TestComm(self) -> None:
 
         try:
+            
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
 
-            #packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
-            packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
+            # txPacket = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
+            txPacket = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
             
             channelList = [ 3, 23, 40, 61, 75 ]
 
@@ -187,21 +200,95 @@ class HoymilesHmDtu:
 
                     print(f"TX {txChannel} RX {rxChannel}", flush=True)
                     totalResponseReceived = 0
+                    totalStatistic : dict[int, int] = { 0x01: 0, 0x02: 0, 0x83: 0 }
 
                     for _ in range(100):
                         time.sleep(0.9)
                         
-                        self.__SendPacket(txChannel, packet)
-                        responseReceived = self.TestReceivePackets(rxChannel, 200)
+                        responseReceived, statistic = self.TestReceivePackets(txChannel, txPacket, rxChannel, 200)
+
                         totalResponseReceived += responseReceived
+                        for k in statistic.keys():
+                            totalStatistic[k] += statistic[k]
 
                         print("." if responseReceived == 0 else "O", end="", flush=True)
 
                     print()
                     print(f"    TX {txChannel} RX {rxChannel} Response {totalResponseReceived}", flush=True)
 
+                    for k in totalStatistic.keys():
+                        print(f"        ${k:02X}: {totalStatistic[k]}", flush=True)
         finally:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
+
+    def TestReceivePacketsScan(self, channelList : list[int]) -> int:
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+
+        responseReceived = 0
+        timeout_ms = 20
+
+        radio = self.__radio
+
+        radio.flush_tx()
+        radio.channel = channelList[0]
+        radio.listen = True
+
+        for _ in range(3):
+            for channel in channelList:
+                radio.channel = channel
+
+                endTime = time.time_ns() + timeout_ms * 1000000
+                while time.time_ns() < endTime:
+                    isDataAvailable, pipeNum = radio.available_pipe()
+
+                    # if isDataAvailable:
+                    #     print("data available")
+
+                    if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
+                        continue
+                    
+                    # TODO: check target radio ID
+
+                    packetLength = radio.get_dynamic_payload_size()
+                    packet = radio.read(packetLength)
+
+                    responseReceived += 1
+
+                    print(f"    rx: frame=${packet[9]:02X} ch={channel} ", flush=True)
+
+        radio.listen = False
+
+        return responseReceived
+
+    def TestCommScan(self) -> None:
+
+        try:
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
+
+            # packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
+            packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
+            
+            # channelList = [ 3, 23, 40, 61, 75 ]
+            channelList = [ 3 ]
+
+            for txChannel in channelList:
+
+                rxChannelList = hmd.RX_CHANNELS_REQUEST_INFO[txChannel]
+
+                print(f"TX {txChannel} RX {rxChannelList}", flush=True)
+
+                for _ in range(100):
+                    time.sleep(0.9)
+                    
+                    print(f"TX ch {txChannel}", flush=True)
+                    self.__SendPacket(txChannel, packet)
+
+                    self.TestReceivePacketsScan(rxChannelList)
+
+        finally:
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
+
 
 
     def PrintNrf24l01Info(self) -> None:
@@ -286,18 +373,17 @@ class HoymilesHmDtu:
             bytes: The DTU radio ID.
         """
 
-        # u = uuid.uuid1().int
+        u = uuid.uuid1().int
+        id = 0
 
-        # id = 0x81000000
-        # id |= (u % 10) << 4
-        # id |= ((u // 10) % 10) << 8
-        # id |= ((u // 100) % 10) << 12
-        # id |= ((u // 1000) % 10) << 16
-        # id |= ((u // 10000) % 10) << 20
+        for _ in range(7):
+            id |= u % 10
+            id <<= 4
+            u //= 10
 
-        # return id.to_bytes(4, "big", signed=False)
+        id |= 0x80000000
 
-        return bytes([0x78, 0x56, 0x30, 0x01])
+        return id.to_bytes(4, "big", signed=False)
 
     @staticmethod
     def CheckChecksum(packet : bytes | bytearray) -> bool:
@@ -318,6 +404,7 @@ if __name__ == "__main__":
     hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
 
     hm.InitializeCommunication()
-    hm.PrintNrf24l01Info()
+    # hm.PrintNrf24l01Info()
     hm.TestComm()
+    # hm.TestCommScan()
 
