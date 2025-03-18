@@ -29,7 +29,6 @@ import pyrf24 as nrf
 import MyCrc as crc
 import time
 import uuid
-#import textwrap
 import HoymilesMessageData as hmd
 import gc
 
@@ -39,7 +38,6 @@ class HoymilesHmDtu:
     """
 
     __RX_PIPE = 1
-    __RX_PACKET_TIMEOUT_NS = 10_000_000
 
     __dtuRadioId : bytes
     __dtuRadioAddress : bytes
