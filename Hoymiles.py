@@ -31,6 +31,7 @@ import time
 import uuid
 import HoymilesMessageData as hmd
 import gc
+from typing import Union
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
@@ -51,7 +52,7 @@ class HoymilesHmDtu:
     __pinCe : int
     __spiFrequency : int
 
-    __radio : nrf.RF24 | None
+    __radio : Union[nrf.RF24, None]
 
     __expectedResponsePackets : list[int]
 
@@ -111,7 +112,7 @@ class HoymilesHmDtu:
 
         self.__radio.set_radiation(powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
 
-    def __SendPacket(self, channel : int, packet : bytearray | bytes) -> bool:
+    def __SendPacket(self, channel : int, packet : Union[bytes, bytearray]) -> bool:
         """ Sends a package to the receiver.
 
         Args:
@@ -288,6 +289,66 @@ class HoymilesHmDtu:
             self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
 
 
+    def QueryInfo(self, txChannel : int = 3) -> None:
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+        radio = self.__radio
+
+        # variables
+        timeout_ms = 20
+        timeout_ns = timeout_ms * 1000000
+
+        rxChannelList = hmd.RX_CHANNELS_REQUEST_INFO[txChannel]
+
+        # create packet
+        packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
+
+        try:
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
+            gc.disable()
+
+            radio.listen = False
+            radio.set_retries(3, 5) # not too many retries because we want to listen fast enough for first packet
+            
+            numResponseReceived = 0
+
+            for _ in range(20):
+                # send packet
+                radio.flush_rx()
+                radio.channel = txChannel
+
+                radio.write(packet)
+
+                # listen for response
+                radio.flush_tx()
+                radio.listen = True
+                
+                for rxChannel in rxChannelList:
+                    radio.channel = rxChannel
+
+                    endTime = time.time_ns() + timeout_ns
+                    while time.time_ns() < endTime:
+                        isDataAvailable, pipeNum = radio.available_pipe()
+
+                        if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
+                            continue
+                        
+                        # TODO: check target radio ID
+
+                        packetLength = radio.get_dynamic_payload_size()
+                        packet = radio.read(packetLength)
+
+                        numResponseReceived += 1
+
+                        # print(f"    rx: frame=${packet[9]:02X} ch={channel} ", flush=True)
+
+            radio.listen = False
+
+        finally:
+            gc.enable()
+            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
+        
+        print(f"got {numResponseReceived} responses")
 
     def PrintNrf24l01Info(self) -> None:
         """ Prints NRF24L01 module information on standard output.
@@ -307,19 +368,18 @@ class HoymilesHmDtu:
         Returns:
             int: The inverter type: 1 = HM300, HM350, HM400; 2 = HM600, HM700, HM800; 3 = HM1200, HM1500
         """
-        match inverterSerialNumber[0:2]:
-            case "10" | "11":
-                match inverterSerialNumber[2:4]:
-                    case "21" | "22" | "24":
-                        return 1
-                    case "41" | "42" | "44":
-                        return 2
-                    case "61" | "62" | "64":
-                        return 4
-                    case _:
-                        pass
-            case _:
-                pass
+        if inverterSerialNumber[0:2] in ("10", "11"):
+            
+            s = inverterSerialNumber[2:4]
+
+            if s in ("21", "22", "24"):
+                return 1
+            
+            if s in ("41", "42", "44"):
+                return 2
+            
+            if s in ("61", "62", "64"):
+                return 4
 
         raise Exception(f"Inverter type with serial number {inverterSerialNumber} is not supported.")
 
@@ -336,15 +396,14 @@ class HoymilesHmDtu:
 
         # 0x80 indicates that it is the last frame
 
-        match inverterNumberOfChannels:
-            case 1:
-                return [ 0x01, 0x82 ]                       # inverter sends 2 frames
-            case 2:
-                return [ 0x01, 0x02, 0x83 ]                 # inverter sends 3 frames
-            case 4:
-                return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]     # inverter sends 5 frames
-            case _:
-                raise Exception(f"Unsupported inverter type {inverterNumberOfChannels}")
+        if inverterNumberOfChannels == 1:
+            return [ 0x01, 0x82 ]                       # inverter sends 2 frames
+        if inverterNumberOfChannels == 2:
+            return [ 0x01, 0x02, 0x83 ]                 # inverter sends 3 frames
+        if inverterNumberOfChannels == 4:
+            return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]     # inverter sends 5 frames
+        
+        raise Exception(f"Unsupported inverter type {inverterNumberOfChannels}")
 
     @staticmethod
     def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
@@ -384,7 +443,7 @@ class HoymilesHmDtu:
         return id.to_bytes(4, "big", signed=False)
 
     @staticmethod
-    def CheckChecksum(packet : bytes | bytearray) -> bool:
+    def CheckChecksum(packet : Union[bytes, bytearray]) -> bool:
         """ Checks the checksum of a packet.
 
         Args:
@@ -402,7 +461,8 @@ if __name__ == "__main__":
     hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
 
     hm.InitializeCommunication()
-    # hm.PrintNrf24l01Info()
-    hm.TestComm()
+    hm.PrintNrf24l01Info()
+    # hm.TestComm()
     # hm.TestCommScan()
+    hm.QueryInfo()
 

@@ -26,6 +26,7 @@ IN THE SOFTWARE.
 """
 
 import MyCrc as crc
+from typing import Union
 
 #--------------------------------------------------------------------------------------------------
 
@@ -177,7 +178,7 @@ def __CreateRequestInfoPayload(currentTime : float) -> bytearray:
     
     return payload
 
-def EscapeData(input : bytes | bytearray) -> bytearray:
+def EscapeData(input : Union[bytes, bytearray]) -> bytearray:
     """ Replaces bytes with special meaning by escape sequences.
         0x7D -> 0x7D 0x5D
         0x7E -> 0x7D 0x5E
@@ -192,22 +193,22 @@ def EscapeData(input : bytes | bytearray) -> bytearray:
     output = bytearray()
 
     for b in input:
-        match b:
-            case 0x7D:
-                output.append(0x7D)
-                output.append(0x5D)
-            case 0x7E:
-                output.append(0x7D)
-                output.append(0x5E)
-            case 0x7F:
-                output.append(0x7D)
-                output.append(0x5F)
-            case _:
-                output.append(b)
+
+        if b == 0x7D:
+            output.append(0x7D)
+            output.append(0x5D)
+        elif b == 0x7E:
+            output.append(0x7D)
+            output.append(0x5E)
+        elif b == 0x7F:
+            output.append(0x7D)
+            output.append(0x5F)
+        else:
+            output.append(b)
 
     return output
 
-def UnescapeData(input : bytes | bytearray) -> bytearray:
+def UnescapeData(input : Union[bytes, bytearray]) -> bytearray:
     """ Undo replace of bytes with special meaning by escape sequences.
 
     Args:
@@ -224,15 +225,16 @@ def UnescapeData(input : bytes | bytearray) -> bytearray:
 
         if b == 0x7D:
             idx += 1
-            match input[idx]:
-                case 0x5D:
-                    output.append(0x7D)
-                case 0x5E:
-                    output.append(0x7E)
-                case 0x5F:
-                    output.append(0x7F)
-                case _:
-                    raise Exception("UnescapeData(): Invalid data, can not decode.")
+            b = input[idx]
+
+            if b == 0x5D:
+                output.append(0x7D)
+            elif b == 0x5E:
+                output.append(0x7E)
+            elif b == 0x5F:
+                output.append(0x7F)
+            else:
+                raise Exception("UnescapeData(): Invalid data, can not decode.")
         else:
             output.append(b)
 

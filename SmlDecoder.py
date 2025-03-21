@@ -266,17 +266,16 @@ def __ValueTypeToStr(valueType : int) -> str:
     Returns:
         str: The value type as a string.
     """
-    match valueType:
-        case 0:
-            return "String"
-        case 4:
-            return "Bool"
-        case 5:
-            return "Int"
-        case 6:
-            return "UInt"
-        case 7:
-            return "List"
-        case _:
-            return "???"
+    if valueType == 0:
+        return "String"
+    if valueType == 4:
+        return "Bool"
+    if valueType == 5:
+        return "Int"
+    if valueType == 6:
+        return "UInt"
+    if valueType == 7:
+        return "List"
+    
+    return "???"
 
