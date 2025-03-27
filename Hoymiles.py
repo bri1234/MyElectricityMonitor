@@ -43,7 +43,6 @@ class HoymilesHmDtu:
     __SPI_FREQUENCY_HZ = 1000000
     __RADIO_POWER_LEVEL = nrf.rf24_pa_dbm_e.RF24_PA_MAX
     __WAIT_BEFORE_RETRY_S = 3
-    __NUMBER_OF_RETRIES = 10
     __MAX_PACKET_SIZE = 32
 
     # list of channels where the inverter listen for requests
@@ -113,8 +112,11 @@ class HoymilesHmDtu:
 
         self.__radio = radio
 
-    def QueryInverterInfo(self) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    def QueryInverterInfo(self, numberOfRetries : int = 20) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
         """ Requests info data from the inverter and returns the inverter response.
+
+        Args:
+            numberOfRetries (int): Number of requests before giving up.
 
         Returns:
             bool: Success (True or False)
@@ -135,7 +137,7 @@ class HoymilesHmDtu:
             # increase power level
             radio.setPALevel(HoymilesHmDtu.__RADIO_POWER_LEVEL)
 
-            for retryIndex in range(HoymilesHmDtu.__NUMBER_OF_RETRIES):
+            for retryIndex in range(numberOfRetries):
 
                 if retryIndex > 0:
                     time.sleep(HoymilesHmDtu.__WAIT_BEFORE_RETRY_S)
@@ -224,32 +226,28 @@ class HoymilesHmDtu:
         
         # extract the data depending on the inverter type
         if self.__inverterNumberOfChannels == 1:
-            return HoymilesHmDtu.__ExtractInverterInfoOneChannel(responseData)
+            return True, HoymilesHmDtu.__ExtractInverterInfoOneChannel(responseData)
 
         if self.__inverterNumberOfChannels == 2:
-            return HoymilesHmDtu.__ExtractInverterInfoTwoChannels(responseData)
+            return True, HoymilesHmDtu.__ExtractInverterInfoTwoChannels(responseData)
 
         # not implemented!
         # if self.__inverterNumberOfChannels == 4:
-        #     return HoymilesHmDtu.__ExtractInverterInfoFourChannels(responseData)
+        #     return True, HoymilesHmDtu.__ExtractInverterInfoFourChannels(responseData)
         
         raise Exception(f"Can not extract inverter info. Inverter with {self.__inverterNumberOfChannels} channel(s) not supported!")
 
     @staticmethod
-    def __ExtractInverterInfoOneChannel(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    def __ExtractInverterInfoOneChannel(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
         """ Extracts inverter infos for inverters with one channel.
 
         Args:
             responseData (bytearray): The response data.
 
         Returns:
-            bool: True if successfull
             dict[str, float | list[dict[str, float]]]: The inverter infos.
         """
         info : dict[str, float | list[dict[str, float]]] = {}
-        
-        if len(responseData) != 30:
-            return False, info
         
         channel1 : dict[str, float] = {}
 
@@ -270,23 +268,19 @@ class HoymilesHmDtu:
         info["T"] = int.from_bytes(responseData[26:28], "big") / 10.0           # °C
         info["EVT"] = int.from_bytes(responseData[28:30], "big") / 1.0          # -
 
-        return True, info
+        return info
 
     @staticmethod
-    def __ExtractInverterInfoTwoChannels(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    def __ExtractInverterInfoTwoChannels(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
         """ Extracts inverter infos for inverters with two channels.
 
         Args:
             responseData (bytearray): The response data.
 
         Returns:
-            bool: True if successfull
             dict[str, float | list[dict[str, float]]]: The inverter infos.
         """
         info : dict[str, float | list[dict[str, float]]] = {}
-        
-        if len(responseData) != 42:
-            return False, info
         
         channel1 : dict[str, float] = {}
 
@@ -315,17 +309,16 @@ class HoymilesHmDtu:
         info["T"] = int.from_bytes(responseData[38:40], "big") / 10.0           # °C
         info["EVT"] = int.from_bytes(responseData[40:42], "big") / 1.0          # -
 
-        return True, info
+        return info
 
     # @staticmethod
-    # def __ExtractInverterInfoFourChannels(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    # def __ExtractInverterInfoFourChannels(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
     #     """ Extracts inverter infos for inverters with four channels.
 
     #     Args:
     #         responseData (bytearray): The response data.
 
     #     Returns:
-    #         bool: True if successfull
     #         dict[str, float | list[dict[str, float]]]: The inverter infos.
     #     """
     #     info : dict[str, float | list[dict[str, float]]] = {}
@@ -337,7 +330,7 @@ class HoymilesHmDtu:
 
     #     info["Channel list"] = [channel1, channel2, channel3, channel4]
 
-    #     return True, info
+    #     return info
 
     def __EvaluateInverterInfoResponse(self, responseList : list[bytearray]) -> tuple[bool, bytearray]:
         """ Checks if the responses are valid and returns the assembled data.
@@ -635,3 +628,4 @@ if __name__ == "__main__":
     success, info = hm.QueryInverterInfo()
 
     print(f"success: {success}")
+    print(info)
