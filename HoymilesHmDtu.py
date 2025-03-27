@@ -35,6 +35,12 @@ class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
         (DTU means 'data transfer unit'.)
 
+        This class needs the pyrf24 module. Install the module with the following line:
+
+        python -m pip install pyrf24
+        
+        (see https://github.com/nRF24/pyRF24)
+
         Usage:
 
             hm = HoymilesHmDtu("1141xxxxxxxx", 0, 24)
