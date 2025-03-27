@@ -29,334 +29,360 @@ import pyrf24 as nrf
 import MyCrc as crc
 import time
 import uuid
-import HoymilesMessageData as hmd
 import gc
-from typing import Union
+import random
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
         DTU means 'data transfer unit'.
     """
 
-    __RX_PIPE = 1
+    __RX_PIPE_NUM = 1
+    __RECEIVE_TIMEOUT_MS = 5
 
-    __dtuRadioId : bytes
+    __SPI_FREQUENCY_HZ = 1000000
+    __RADIO_POWER_LEVEL = nrf.rf24_pa_dbm_e.RF24_PA_MAX
+    __WAIT_BEFORE_RETRY_S = 3
+    __NUMBER_OF_RETRIES = 10
+    __MAX_PACKET_SIZE = 32
+
+    # list of channels where the inverter listen for requests
+    __TX_CHANNELS = [ 3, 23, 40, 61, 75 ]
+
+    # list of channels where the inverter sends the responses depending on the channel, where the request was received
+    __RX_CHANNEL_LISTS = {
+        3: [ 23, 40, 61 ],
+        23: [ 40, 61, 75 ],
+        40 : [ 61, 75,  3 ],
+        61 : [ 75,  3, 23 ],
+        75 : [  3, 23, 40 ]
+    }
+
     __dtuRadioAddress : bytes
 
     __inverterSerialNumber : str
-    __inverterRadioId : bytes
-    __inverterRadioAddress : bytes
     __inverterNumberOfChannels : int
+    __inverterRadioAddress : bytes
 
     __pinCsn : int
     __pinCe : int
-    __spiFrequency : int
 
-    __radio : Union[nrf.RF24, None]
-
-    __expectedResponsePackets : list[int]
+    __radio : nrf.RF24 | None
 
     def __init__(self, inverterSerialNumber : str,
-                 pinCsn : int = 0, pinCe : int = 24, spiFrequency : int = 1000000) -> None:
-        """ Creates a new communication object.
+                 pinCsn : int = 0, pinCe : int = 24) -> None:
+        """ Creates a new Hoymiles HM communication object.
 
         Args:
             inverterSerialNumber (str): The inverter serial number. (As printed on a sticker on the inverter case.)
             pinCsn (int, optional): The CSN pin as SPI device number (0 or 1). Defaults to 0.
             pinCe (int, optional): The GPIO pin connected to NRF24L01 signal CE. Defaults to 24.
-            spiFrequency (int, optional): The SPI frequency in Hz. Defaults to 1000000.
-            txChannelNumber (int, optional): TX channel number 0 .. 4.
         """
         self.__inverterSerialNumber = inverterSerialNumber
         self.__pinCsn = pinCsn
         self.__pinCe = pinCe
-        self.__spiFrequency = spiFrequency
 
-        self.__dtuRadioId = HoymilesHmDtu.__GenerateDtuRadioId()
-        self.__dtuRadioAddress = b'\01' + self.__dtuRadioId
-
-        self.__inverterRadioId = HoymilesHmDtu.__GetInverterRadioId(self.__inverterSerialNumber)
-        self.__inverterRadioAddress = b'\01' + self.__inverterRadioId
-
+        self.__dtuRadioAddress = HoymilesHmDtu.__GenerateDtuRadioAddress()
+        self.__inverterRadioAddress = HoymilesHmDtu.__GetInverterRadioAddress(self.__inverterSerialNumber)
         self.__inverterNumberOfChannels = HoymilesHmDtu.__GetInverterNumberOfChannels(self.__inverterSerialNumber)
-        self.__expectedResponsePackets = HoymilesHmDtu.__GetResponseFramesFromInverterType(self.__inverterNumberOfChannels)
 
     def InitializeCommunication(self) -> None:
         """ Initializes the NRF24L01 communication.
         """
-        radio = nrf.RF24(self.__pinCe, self.__pinCsn, self.__spiFrequency)
+        radio = nrf.RF24(self.__pinCe, self.__pinCsn, HoymilesHmDtu.__SPI_FREQUENCY_HZ)
 
         if not radio.begin():
             raise Exception("Can not initialize RF24!")
+        
+        if not radio.isChipConnected():
+            raise Exception("Error chip is not connected!")
 
-        radio.set_radiation(nrf.rf24_pa_dbm_e.RF24_PA_LOW, nrf.rf24_datarate_e.RF24_250KBPS)
-        radio.set_retries(3, 15)
-        radio.dynamic_payloads = True
-        radio.set_auto_ack(HoymilesHmDtu.__RX_PIPE, True)
-        radio.crc_length = nrf.rf24_crclength_e.RF24_CRC_16
-        radio.address_width = 5
+        radio.stopListening()
 
-        radio.open_rx_pipe(HoymilesHmDtu.__RX_PIPE, self.__dtuRadioAddress)
-        radio.open_tx_pipe(self.__inverterRadioAddress)
+        radio.setDataRate(nrf.rf24_datarate_e.RF24_250KBPS)
+        radio.setPALevel(nrf.rf24_pa_dbm_e.RF24_PA_MIN)
+        radio.setCRCLength(nrf.rf24_crclength_e.RF24_CRC_16)
+        radio.setAddressWidth(5)
+
+        radio.openWritingPipe(b'\01' + self.__inverterRadioAddress)
+        radio.openReadingPipe(HoymilesHmDtu.__RX_PIPE_NUM, b'\01' + self.__dtuRadioAddress)
+
+        radio.enableDynamicPayloads()
+        radio.setRetries(3, 10)
+        radio.setAutoAck(True)
 
         self.__radio = radio
 
-    def __SetPowerLevel(self, powerLevel : nrf.rf24_pa_dbm_e) -> None:
-        """ Changes the output power level.
+    def QueryInverterInfo(self) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+        """ Requests info data from the inverter and returns the inverter response.
 
-        Args:
-            powerLevel (nrf.rf24_pa_dbm_e): The new power level.
+        Returns:
+            bool: Success (True or False)
+            dict[str, float | list[dict[str, float]]]: The inverter information.
         """
+
         if self.__radio is None:
             raise Exception("Communication is not initialized!")
-
-        self.__radio.set_radiation(powerLevel, nrf.rf24_datarate_e.RF24_250KBPS)
-
-    def __SendPacket(self, channel : int, packet : Union[bytes, bytearray]) -> bool:
-        """ Sends a package to the receiver.
-
-        Args:
-            channel (int): The channel where the data shall be sent.
-            packet (bytearray): The data.
-        """
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
-
-        if (0x7E in packet) or (0x7F in packet):
-            raise Exception("the data to be sent must not contain the control bytes 0x7E, 0x7F")
-
-        radio = self.__radio
-
-        radio.listen = False
-        radio.flush_rx()
-        radio.channel = channel
-
-        success = radio.write(packet)
-        return success
-
-    def TestReceivePackets(self, txChannel : int, txPacket : bytearray, rxChannel : int, timeout_ms : int) -> tuple[int, dict[int, int]]:
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
-
-        try:
-            gc.disable()
-            responseReceived = 0
-
-            radio = self.__radio
-
-            statistic : dict[int, int] = { 0x01: 0, 0x02: 0, 0x83: 0 }
-            endTime = time.time_ns() + timeout_ms * 1000000
-
-            radio.listen = False
-            radio.flush_rx()
-            radio.set_retries(3, 6) # not too many reties to listen fast enough on packet 1
-            radio.channel = txChannel
-
-            radio.write(txPacket)
-
-            # radio.flush_tx()
-            radio.channel = rxChannel
-            radio.listen = True
-
-            while time.time_ns() < endTime:
-
-                isDataAvailable, pipeNum = radio.available_pipe()
-                if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
-                    continue
-
-                # TODO: check target radio ID
-
-                packetLength = radio.get_dynamic_payload_size()
-                packet = radio.read(packetLength)
-                frameNum = packet[9]
-
-                responseReceived += 1
-                statistic[frameNum] += 1
-
-                # print(f"    rx: frame=${frameNum:02X} ch={channel} ", flush=True)
-
-            radio.listen = False
-
-            return responseReceived, statistic
-        finally:
-            gc.enable()
-
-    def TestComm(self) -> None:
-
-        try:
-            
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
-
-            # txPacket = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
-            txPacket = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
-            
-            channelList = [ 3, 23, 40, 61, 75 ]
-
-            for txChannel in channelList:
-                for rxChannel in channelList:
-                    if txChannel == rxChannel:
-                        continue
-
-                    print(f"TX {txChannel} RX {rxChannel}", flush=True)
-                    totalResponseReceived = 0
-                    totalStatistic : dict[int, int] = { 0x01: 0, 0x02: 0, 0x83: 0 }
-
-                    for _ in range(200):
-                        time.sleep(0.9)
-                        
-                        responseReceived, statistic = self.TestReceivePackets(txChannel, txPacket, rxChannel, 200)
-
-                        totalResponseReceived += responseReceived
-                        for k in statistic.keys():
-                            totalStatistic[k] += statistic[k]
-
-                        print("." if responseReceived == 0 else "O", end="", flush=True)
-
-                    print()
-                    print(f"    TX {txChannel} RX {rxChannel} Response {totalResponseReceived}", flush=True)
-
-                    for k in totalStatistic.keys():
-                        print(f"        ${k:02X}: {totalStatistic[k]}", flush=True)
-        finally:
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
-
-    def TestReceivePacketsScan(self, channelList : list[int]) -> int:
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
-
-        responseReceived = 0
-        timeout_ms = 20
-
+        
         radio = self.__radio
 
         radio.flush_tx()
-        radio.channel = channelList[0]
-        radio.listen = True
-
-        for _ in range(3):
-            for channel in channelList:
-                radio.channel = channel
-
-                endTime = time.time_ns() + timeout_ms * 1000000
-                while time.time_ns() < endTime:
-                    isDataAvailable, pipeNum = radio.available_pipe()
-
-                    # if isDataAvailable:
-                    #     print("data available")
-
-                    if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
-                        continue
-                    
-                    # TODO: check target radio ID
-
-                    packetLength = radio.get_dynamic_payload_size()
-                    packet = radio.read(packetLength)
-
-                    responseReceived += 1
-
-                    print(f"    rx: frame=${packet[9]:02X} ch={channel} ", flush=True)
-
-        radio.listen = False
-
-        return responseReceived
-
-    def TestCommScan(self) -> None:
+        radio.flush_rx()
 
         try:
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
-
-            # packet = hmd.CreateRfVersionPacket(self.__inverterRadioId, self.__dtuRadioId)
-            packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
-            
-            # channelList = [ 3, 23, 40, 61, 75 ]
-            channelList = [ 3 ]
-
-            for txChannel in channelList:
-
-                rxChannelList = hmd.RX_CHANNELS_REQUEST_INFO[txChannel]
-
-                print(f"TX {txChannel} RX {rxChannelList}", flush=True)
-
-                for _ in range(100):
-                    time.sleep(0.9)
-                    
-                    print(f"TX ch {txChannel}", flush=True)
-                    self.__SendPacket(txChannel, packet)
-
-                    self.TestReceivePacketsScan(rxChannelList)
-
-        finally:
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
-
-
-    def QueryInfo(self, txChannel : int = 3) -> None:
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
-        radio = self.__radio
-
-        # variables
-        timeout_ms = 20
-        timeout_ns = timeout_ms * 1000000
-
-        rxChannelList = hmd.RX_CHANNELS_REQUEST_INFO[txChannel]
-
-        # create packet
-        packet = hmd.CreateRequestInfoPacket(self.__inverterRadioId, self.__dtuRadioId, time.time())
-
-        try:
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_HIGH)
             gc.disable()
 
-            radio.listen = False
-            radio.set_retries(3, 5) # not too many retries because we want to listen fast enough for first packet
-            
-            numResponseReceived = 0
+            # increase power level
+            radio.setPALevel(HoymilesHmDtu.__RADIO_POWER_LEVEL)
 
-            for _ in range(20):
-                # send packet
-                radio.flush_rx()
-                radio.channel = txChannel
+            for retryIndex in range(HoymilesHmDtu.__NUMBER_OF_RETRIES):
 
-                radio.write(packet)
+                if retryIndex > 0:
+                    time.sleep(HoymilesHmDtu.__WAIT_BEFORE_RETRY_S)
 
-                # listen for response
-                radio.flush_tx()
-                radio.listen = True
+                # select a random channel for the request
+                txChannelIndex = random.randint(0, len(HoymilesHmDtu.__TX_CHANNELS) - 1)
+                txChannel = HoymilesHmDtu.__TX_CHANNELS[txChannelIndex]
+                rxChannelList = HoymilesHmDtu.__RX_CHANNEL_LISTS[txChannel]
+
+                # create packet to send to the inverter
+                txPacket = HoymilesHmDtu.CreateRequestInfoPacket(self.__inverterRadioAddress, self.__dtuRadioAddress, time.time())
                 
-                for rxChannel in rxChannelList:
-                    radio.channel = rxChannel
+                # send request and scan for responses
+                responseList = HoymilesHmDtu.__SendRequestAndScanForResponses(radio, txChannel, rxChannelList, txPacket)
 
-                    endTime = time.time_ns() + timeout_ns
-                    while time.time_ns() < endTime:
-                        isDataAvailable, pipeNum = radio.available_pipe()
-
-                        if (not isDataAvailable) or (pipeNum != HoymilesHmDtu.__RX_PIPE):
-                            continue
-                        
-                        # TODO: check target radio ID
-
-                        packetLength = radio.get_dynamic_payload_size()
-                        packet = radio.read(packetLength)
-
-                        numResponseReceived += 1
-
-                        # print(f"    rx: frame=${packet[9]:02X} ch={channel} ", flush=True)
-
-            radio.listen = False
+                # did we get a valid response?
+                success, responseData = self.__EvaluateInverterInfoResponse(responseList)
+                if success:
+                    success, info = self.__ExtractInverterInfo(responseData)
+                    if success:
+                        return True, info
 
         finally:
+            radio.setPALevel(nrf.rf24_pa_dbm_e.RF24_PA_MIN)
             gc.enable()
-            self.__SetPowerLevel(nrf.rf24_pa_dbm_e.RF24_PA_LOW)
-        
-        print(f"got {numResponseReceived} responses")
 
-    def PrintNrf24l01Info(self) -> None:
-        """ Prints NRF24L01 module information on standard output.
+        return False, {}
+
+    @staticmethod
+    def __SendRequestAndScanForResponses(radio : nrf.RF24, txChannel : int, rxChannelList : list[int],
+                                         txPacket : bytearray) -> list[bytearray]:
+        """ Send a request to the inverter and scan receive channels for the response.
+
+        Args:
+            radio (nrf.RF24): The radio used to sent the request.
+            txChannel (int): The channel where the request shall be sent.
+            rxChannelList (list[int]): The channel list to scan for responses.
+            txPacket (bytearray): The request packet.
+
+        Returns:
+            list[bytearray]: List of reponse packets.
         """
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
+        responseList : list[bytearray] = []
 
-        self.__radio.print_pretty_details()
+        # send request to the inverter
+        radio.stopListening()
+        radio.setChannel(txChannel)
+        radio.flush_rx()
+
+        radio.write(txPacket)
+
+        # scan channels for response from the inverter
+        radio.startListening()
+
+        for rxChannelIndex in range(100):
+            rxChannel = rxChannelList[rxChannelIndex % 3]
+
+            radio.setChannel(rxChannel)
+
+            endTime = time.time_ns() + HoymilesHmDtu.__RECEIVE_TIMEOUT_MS * 1000000
+
+            while time.time_ns() < endTime:
+                if radio.available():
+                    packetLen = radio.getDynamicPayloadSize()
+                    rxBuffer = radio.read(packetLen)
+                    radio.flush_rx()
+                    responseList.append(rxBuffer)
+
+        return responseList
+
+    def __ExtractInverterInfo(self, responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+        """ Extracts the inverter infos from the reponse data.
+
+        Args:
+            responseData (bytearray): The response data.
+
+        Returns:
+            bool: True if successfull
+            dict[str, float | list[dict[str, float]]]: The inverter infos.
+        """
+        # check the checksum
+        crc1 = int.from_bytes(responseData[-2:], "big")
+        crc2 = crc.CalculateHoymilesCrc16(responseData, len(responseData) - 2)
+        if crc1 != crc2:
+            return False, {}
+        
+        # extract the data depending on the inverter type
+        if self.__inverterNumberOfChannels == 1:
+            return HoymilesHmDtu.__ExtractInverterInfoOneChannel(responseData)
+
+        if self.__inverterNumberOfChannels == 2:
+            return HoymilesHmDtu.__ExtractInverterInfoTwoChannels(responseData)
+
+        # not implemented!
+        # if self.__inverterNumberOfChannels == 4:
+        #     return HoymilesHmDtu.__ExtractInverterInfoFourChannels(responseData)
+        
+        raise Exception(f"Can not extract inverter info. Inverter with {self.__inverterNumberOfChannels} channel(s) not supported!")
+
+    @staticmethod
+    def __ExtractInverterInfoOneChannel(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+        """ Extracts inverter infos for inverters with one channel.
+
+        Args:
+            responseData (bytearray): The response data.
+
+        Returns:
+            bool: True if successfull
+            dict[str, float | list[dict[str, float]]]: The inverter infos.
+        """
+        info : dict[str, float | list[dict[str, float]]] = {}
+        
+        if len(responseData) != 30:
+            return False, info
+        
+        channel1 : dict[str, float] = {}
+
+        channel1["DcV"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
+        channel1["DcI"] = int.from_bytes(responseData[4:6], "big") / 100.0          # A
+        channel1["DcP"] = int.from_bytes(responseData[6:8], "big") / 10.0           # W
+        channel1["DcTotalE"] = int.from_bytes(responseData[8:12], "big") / 1000.0   # kWh
+        channel1["DcDayE"] = int.from_bytes(responseData[12:14], "big") / 1.0       # Wh
+
+        info["Channel list"] = [channel1]
+
+        info["AcV"] = int.from_bytes(responseData[14:16], "big") / 10.0         # V
+        info["AcF"] = int.from_bytes(responseData[16:18], "big") / 100.0        # Hz
+        info["AcP"] = int.from_bytes(responseData[18:20], "big") / 10.0         # W
+        info["Q"] = int.from_bytes(responseData[20:22], "big") / 10.0           # -
+        info["AcI"] = int.from_bytes(responseData[22:24], "big") / 100.0        # A
+        info["AcPF"] = int.from_bytes(responseData[24:26], "big") / 1000.0      # -
+        info["T"] = int.from_bytes(responseData[26:28], "big") / 10.0           # °C
+        info["EVT"] = int.from_bytes(responseData[28:30], "big") / 1.0          # -
+
+        return True, info
+
+    @staticmethod
+    def __ExtractInverterInfoTwoChannels(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+        """ Extracts inverter infos for inverters with two channels.
+
+        Args:
+            responseData (bytearray): The response data.
+
+        Returns:
+            bool: True if successfull
+            dict[str, float | list[dict[str, float]]]: The inverter infos.
+        """
+        info : dict[str, float | list[dict[str, float]]] = {}
+        
+        if len(responseData) != 42:
+            return False, info
+        
+        channel1 : dict[str, float] = {}
+
+        channel1["DcV"] = int.from_bytes(responseData[2:4], "big") / 10.0          # V
+        channel1["DcI"] = int.from_bytes(responseData[4:6], "big") / 100.0         # A
+        channel1["DcP"] = int.from_bytes(responseData[6:8], "big") / 10.0          # W
+        channel1["DcTotalE"] = int.from_bytes(responseData[14:18], "big") / 1000.0 # kWh
+        channel1["DcDayE"] = int.from_bytes(responseData[22:24], "big") / 1.0      # Wh
+
+        channel2 : dict[str, float] = {}
+
+        channel2["DcV"] = int.from_bytes(responseData[8:10], "big") / 10.0         # V
+        channel2["DcI"] = int.from_bytes(responseData[10:12], "big") / 100.0       # A
+        channel2["DcP"] = int.from_bytes(responseData[12:14], "big") / 10.0        # W
+        channel2["DcTotalE"] = int.from_bytes(responseData[18:22], "big") / 1000.0 # kWh
+        channel2["DcDayE"] = int.from_bytes(responseData[24:26], "big") / 1.0      # Wh
+
+        info["Channel list"] = [channel1, channel2]
+
+        info["AcV"] = int.from_bytes(responseData[26:28], "big") / 10.0         # V
+        info["AcF"] = int.from_bytes(responseData[28:30], "big") / 100.0        # Hz
+        info["AcP"] = int.from_bytes(responseData[30:32], "big") / 10.0         # W
+        info["Q"] = int.from_bytes(responseData[32:34], "big") / 10.0           # -
+        info["AcI"] = int.from_bytes(responseData[34:36], "big") / 100.0        # A
+        info["AcPF"] = int.from_bytes(responseData[36:38], "big") / 1000.0      # -
+        info["T"] = int.from_bytes(responseData[38:40], "big") / 10.0           # °C
+        info["EVT"] = int.from_bytes(responseData[40:42], "big") / 1.0          # -
+
+        return True, info
+
+    # @staticmethod
+    # def __ExtractInverterInfoFourChannels(responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    #     """ Extracts inverter infos for inverters with four channels.
+
+    #     Args:
+    #         responseData (bytearray): The response data.
+
+    #     Returns:
+    #         bool: True if successfull
+    #         dict[str, float | list[dict[str, float]]]: The inverter infos.
+    #     """
+    #     info : dict[str, float | list[dict[str, float]]] = {}
+        
+    #     channel1 : dict[str, float] = {}
+    #     channel2 : dict[str, float] = {}
+    #     channel3 : dict[str, float] = {}
+    #     channel4 : dict[str, float] = {}
+
+    #     info["Channel list"] = [channel1, channel2, channel3, channel4]
+
+    #     return True, info
+
+    def __EvaluateInverterInfoResponse(self, responseList : list[bytearray]) -> tuple[bool, bytearray]:
+        """ Checks if the responses are valid and returns the assembled data.
+
+        Args:
+            responseList (list[bytearray]): List of received inverter responses.
+
+        Returns:
+            bool: True if all responses are valid.
+            bytearray: The assembled response data.
+        """
+        
+        numberOfResponses = self.__inverterNumberOfChannels + 1
+        responseData = bytearray()
+
+        # did we get the right number of responses?
+        if len(responseList) != numberOfResponses:
+            return False, responseData
+
+        for idx in range(numberOfResponses):
+            response = responseList[idx]
+
+            # are the frame numbers valid?
+            frameNumberResponse = response[9]
+            frameNumberExpected = idx + 1
+            if frameNumberExpected == numberOfResponses: # is it the last frame?
+                frameNumberExpected |= 0x80
+
+            if frameNumberResponse != frameNumberExpected:
+                return False, responseData
+
+            # are the receiver addresses valid?
+            address1 = response[1:5]
+            address2 = response[5:9]
+            if (address1 != self.__inverterRadioAddress) or (address2 != self.__inverterRadioAddress):
+                return False, responseData
+
+            # is the checksum valid?
+            if not HoymilesHmDtu.CheckChecksum(response):
+                return False, responseData
+            
+            # header is 10 bytes and last byte is the checksum
+            responseData.extend(response[10:-1])
+
+        return True, responseData
 
     @staticmethod
     def __GetInverterNumberOfChannels(inverterSerialNumber : str) -> int:
@@ -382,31 +408,9 @@ class HoymilesHmDtu:
                 return 4
 
         raise Exception(f"Inverter type with serial number {inverterSerialNumber} is not supported.")
-
+    
     @staticmethod
-    def __GetResponseFramesFromInverterType(inverterNumberOfChannels : int) -> list[int]:
-        """ Returns a list of the frames that the inverter will send if data is querried.
-
-        Args:
-            inverterNumberOfChannels (int): The type of the inverter.
-
-        Returns:
-            list[int]: List of packet types for a response on a data query.
-        """
-
-        # 0x80 indicates that it is the last frame
-
-        if inverterNumberOfChannels == 1:
-            return [ 0x01, 0x82 ]                       # inverter sends 2 frames
-        if inverterNumberOfChannels == 2:
-            return [ 0x01, 0x02, 0x83 ]                 # inverter sends 3 frames
-        if inverterNumberOfChannels == 4:
-            return [ 0x01, 0x02, 0x03, 0x04, 0x85 ]     # inverter sends 5 frames
-        
-        raise Exception(f"Unsupported inverter type {inverterNumberOfChannels}")
-
-    @staticmethod
-    def __GetInverterRadioId(inverterSerialNumber : str) -> bytes:
+    def __GetInverterRadioAddress(inverterSerialNumber : str) -> bytes:
         """ Returns the inverter radio ID from the serial number.
             The radio ID is used to send and receive packets.
 
@@ -422,7 +426,7 @@ class HoymilesHmDtu:
         return bytes(serialNumber)
 
     @staticmethod
-    def __GenerateDtuRadioId() -> bytes:
+    def __GenerateDtuRadioAddress() -> bytes:
         """ Generates a DTU radio ID (data transfer unit, this device) from the system UUID.
             The radio ID is used to send and receive packets.
 
@@ -443,7 +447,7 @@ class HoymilesHmDtu:
         return id.to_bytes(4, "big", signed=False)
 
     @staticmethod
-    def CheckChecksum(packet : Union[bytes, bytearray]) -> bool:
+    def CheckChecksum(packet : bytes | bytearray) -> bool:
         """ Checks the checksum of a packet.
 
         Args:
@@ -456,13 +460,178 @@ class HoymilesHmDtu:
         checksum2 = packet[-1]
         return checksum1 == checksum2
 
+    @staticmethod
+    def EscapeData(input : bytes | bytearray) -> bytearray:
+        """ Replaces bytes with special meaning by escape sequences.
+            0x7D -> 0x7D 0x5D
+            0x7E -> 0x7D 0x5E
+            0x7F -> 0x7D 0x5F
+
+        Args:
+            input (bytes | bytearray): The input data.
+
+        Returns:
+            bytearray: The escaped output data.
+        """
+        output = bytearray()
+
+        for b in input:
+
+            if b == 0x7D:
+                output.append(0x7D)
+                output.append(0x5D)
+            elif b == 0x7E:
+                output.append(0x7D)
+                output.append(0x5E)
+            elif b == 0x7F:
+                output.append(0x7D)
+                output.append(0x5F)
+            else:
+                output.append(b)
+
+        return output
+
+    @staticmethod
+    def UnescapeData(input : bytes | bytearray) -> bytearray:
+        """ Undo replace of bytes with special meaning by escape sequences.
+
+        Args:
+            input (bytes | bytearray): The input data.
+
+        Returns:
+            bytearray: The output data without escaped bytes.
+        """
+        output = bytearray()
+
+        idx = 0
+        while idx < len(input):
+            b = input[idx]
+
+            if b == 0x7D:
+                idx += 1
+                b = input[idx]
+
+                if b == 0x5D:
+                    output.append(0x7D)
+                elif b == 0x5E:
+                    output.append(0x7E)
+                elif b == 0x5F:
+                    output.append(0x7F)
+                else:
+                    raise Exception("UnescapeData(): Invalid data, can not decode.")
+            else:
+                output.append(b)
+
+            idx += 1
+
+        return output
+
+    @staticmethod
+    def CreateRequestInfoPacket(receiverAddr : bytes, senderAddr : bytes, currentTime : float) -> bytearray:
+        """ Creates the packet that can be sent to the inverter to request information.
+
+        Args:
+            receiverAddr (bytes): The address of the receiver generated from the receiver (inverter) serial number. (4 bytes)
+            senderAddr (bytes): The address of the sender generated from the sender (DTU) serial number. (4 bytes)
+            currentTime (float): The current time in seconds since the start of the epoch.
+
+        Returns:
+            bytearray: The packet to be sent to the inverter.
+        """
+        # the header
+        packet = HoymilesHmDtu.__CreatePacketHeader(0x15, receiverAddr, senderAddr, 0x80)
+
+        # the payload
+        payload = HoymilesHmDtu.__CreateRequestInfoPayload(currentTime)
+        packet.extend(payload)
+
+        # the payload checksum
+        payloadChecksum = crc.CalculateHoymilesCrc16(payload, len(payload))
+        packet.extend(payloadChecksum.to_bytes(2, "big", signed=False))
+
+        # the packet checksum
+        packetChecksum = crc.CalculateHoymilesCrc8(packet, len(packet))
+        packet.extend(packetChecksum.to_bytes(1, "big", signed=False))
+
+        if len(packet) != 27:
+            raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} != 27")
+        
+        # replace special characters
+        packet = HoymilesHmDtu.EscapeData(packet)
+
+        if len(packet) > HoymilesHmDtu.__MAX_PACKET_SIZE:
+            raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} > MAX_PACKET_SIZE {HoymilesHmDtu.__MAX_PACKET_SIZE}")
+        
+        return packet
+
+    @staticmethod
+    def __CreatePacketHeader(command : int, receiverAddr : bytes, senderAddr : bytes, frame : int) -> bytearray:
+        """ Creates the packet header.
+
+        Args:
+            command (InverterCmd): The packet command.
+            receiverAddr (bytes): The address of the receiver generated from the receiver (inverter) serial number. (4 bytes)
+            senderAddr (bytes): The address of the sender generated from the sender (DTU) serial number. (4 bytes)
+            frame (int): The frame number for message data.
+
+        Returns:
+            bytearray: The packet header.
+        """
+        if len(receiverAddr) != 4:
+            raise Exception(f"Invalid length of receiver address: {len(receiverAddr)}. (must be 4 bytes)")
+        
+        if len(senderAddr) != 4:
+            raise Exception(f"Invalid length of sender address: {len(senderAddr)}. (must be 4 bytes)")
+        
+        header = bytearray(10)
+
+        header[0] = command
+        header[1:5] = receiverAddr
+        header[5:9] = senderAddr
+        header[9] = frame
+        
+        if len(header) != 10:
+            raise Exception(f"Internal error __CreatePacketHeader: size {len(header)} != 10")
+        
+        return header
+
+    @staticmethod
+    def __CreateRequestInfoPayload(currentTime : float) -> bytearray:
+        """ Creates payload data filled with the time.
+
+        Args:
+            currentTime (float): The current time in seconds since the start of the epoch.
+
+        Returns:
+            bytearray: The payload data.
+        """
+        payload = bytearray(14)
+
+        payload[0] = 0x0B   # sub command
+        payload[1] = 0x00   # revision
+        payload[2:6] = int(currentTime).to_bytes(4, "big", signed = False)
+        payload[9] = 0x05
+
+        if len(payload) != 14:
+            raise Exception(f"Internal error __CreateRequestInfoPayload: size {len(payload)} != 14")
+        
+        return payload
+    
+    def PrintNrf24l01Info(self) -> None:
+        """ Prints NRF24L01 module information on standard output.
+        """
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+
+        self.__radio.print_pretty_details()
+
+
 if __name__ == "__main__":
 
-    hm = HoymilesHmDtu("114184020874", 0, 24, 1000000)
+    hm = HoymilesHmDtu("114184020874", 0, 24)
 
     hm.InitializeCommunication()
-    hm.PrintNrf24l01Info()
-    # hm.TestComm()
-    # hm.TestCommScan()
-    hm.QueryInfo()
 
+    success, info = hm.QueryInverterInfo()
+
+    print(f"success: {success}")
