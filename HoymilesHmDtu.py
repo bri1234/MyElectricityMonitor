@@ -26,7 +26,6 @@ IN THE SOFTWARE.
 """
 
 import pyrf24 as nrf
-import MyCrc as crc
 import time
 import uuid
 import gc
@@ -34,15 +33,32 @@ import random
 
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
-        DTU means 'data transfer unit'.
+        (DTU means 'data transfer unit'.)
+
+        Usage:
+
+            hm = HoymilesHmDtu("1141xxxxxxxx", 0, 24)
+            hm.InitializeCommunication()
+            success, info = hm.QueryInverterInfo()
+
     """
 
+    # the nRF24L01 receive pipeline
     __RX_PIPE_NUM = 1
+
+    # timeout for channel scan
     __RECEIVE_TIMEOUT_MS = 5
 
+    # the SPI communication frequency
     __SPI_FREQUENCY_HZ = 1000000
+
+    # the power level to send the request to the receiver
     __RADIO_POWER_LEVEL = nrf.rf24_pa_dbm_e.RF24_PA_MAX
+
+    # time to wait before a new request is sent to the inverter if the previous request was not received
     __WAIT_BEFORE_RETRY_S = 3
+
+    # maximum size of packets that can be sent with the nRF24L01 module
     __MAX_PACKET_SIZE = 32
 
     # list of channels where the inverter listen for requests
@@ -57,15 +73,25 @@ class HoymilesHmDtu:
         75 : [  3, 23, 40 ]
     }
 
+    # DTU (this device) 4 bytes radio address
     __dtuRadioAddress : bytes
 
+    # inverter serial number (12 digits)
     __inverterSerialNumber : str
+
+    # the inverter has 1, 2 or 4 channels
     __inverterNumberOfChannels : int
+
+    # inverter 4 bytes radio address (part of the inverter serial number)
     __inverterRadioAddress : bytes
 
+    # the CSn pin: 0 or 1, usually 0
     __pinCsn : int
+
+    # the GPIO pin where the CE signal is connected
     __pinCe : int
 
+    # the nRF24L01 radio object
     __radio : nrf.RF24 | None
 
     def __init__(self, inverterSerialNumber : str,
@@ -74,7 +100,7 @@ class HoymilesHmDtu:
 
         Args:
             inverterSerialNumber (str): The inverter serial number. (As printed on a sticker on the inverter case.)
-            pinCsn (int, optional): The CSN pin as SPI device number (0 or 1). Defaults to 0.
+            pinCsn (int, optional): The CSN pin as SPI device number (0 or 1), usually 0. Defaults to 0.
             pinCe (int, optional): The GPIO pin connected to NRF24L01 signal CE. Defaults to 24.
         """
         self.__inverterSerialNumber = inverterSerialNumber
@@ -132,8 +158,6 @@ class HoymilesHmDtu:
         radio.flush_rx()
 
         try:
-            gc.disable()
-
             # increase power level
             radio.setPALevel(HoymilesHmDtu.__RADIO_POWER_LEVEL)
 
@@ -148,23 +172,50 @@ class HoymilesHmDtu:
                 rxChannelList = HoymilesHmDtu.__RX_CHANNEL_LISTS[txChannel]
 
                 # create packet to send to the inverter
-                txPacket = HoymilesHmDtu.CreateRequestInfoPacket(self.__inverterRadioAddress, self.__dtuRadioAddress, time.time())
+                txPacket = HoymilesHmDtu.__CreateRequestInfoPacket(self.__inverterRadioAddress, self.__dtuRadioAddress, time.time())
                 
                 # send request and scan for responses
                 responseList = HoymilesHmDtu.__SendRequestAndScanForResponses(radio, txChannel, rxChannelList, txPacket)
 
                 # did we get a valid response?
-                success, responseData = self.__EvaluateInverterInfoResponse(responseList)
+                success, responseData = HoymilesHmDtu.__EvaluateInverterInfoResponse(responseList, self.__inverterRadioAddress, self.__inverterNumberOfChannels)
                 if success:
-                    success, info = self.__ExtractInverterInfo(responseData)
+                    success, info = HoymilesHmDtu.__ExtractInverterInfo(responseData, self.__inverterNumberOfChannels)
                     if success:
                         return True, info
 
         finally:
             radio.setPALevel(nrf.rf24_pa_dbm_e.RF24_PA_MIN)
-            gc.enable()
 
         return False, {}
+
+    @staticmethod
+    def PrintInverterInfo(info : dict[str, float | list[dict[str, float]]]) -> None:
+        """ Prints inverter information in human readable form.
+
+        Args:
+            info (dict[str, float  |  list[dict[str, float]]]): The inverter information got with function QueryInverterInfo().
+        """
+        for key in info.keys():
+            value = info[key]
+            
+            if key == "Channels" and isinstance(value, list):
+                for channelIndex in range(len(value)):
+                    print(f"Channel {channelIndex + 1}")
+
+                    for k in value[channelIndex].keys():
+                        print(f"    {k} = {value[channelIndex][k]}")
+
+            else:
+                print(f"{key} = {info[key]}")
+
+    def PrintNrf24l01Info(self) -> None:
+        """ Prints NRF24L01 module information on standard output.
+        """
+        if self.__radio is None:
+            raise Exception("Communication is not initialized!")
+
+        self.__radio.print_pretty_details()
 
     @staticmethod
     def __SendRequestAndScanForResponses(radio : nrf.RF24, txChannel : int, rxChannelList : list[int],
@@ -182,37 +233,52 @@ class HoymilesHmDtu:
         """
         responseList : list[bytearray] = []
 
-        # send request to the inverter
-        radio.stopListening()
-        radio.setChannel(txChannel)
-        radio.flush_rx()
+        try:
+            gc.disable()
 
-        radio.write(txPacket)
+            # send request to the inverter
+            radio.stopListening()
+            radio.setChannel(txChannel)
+            radio.flush_rx()
 
-        # scan channels for response from the inverter
-        radio.startListening()
+            radio.write(txPacket)
 
-        for rxChannelIndex in range(100):
-            rxChannel = rxChannelList[rxChannelIndex % 3]
+            # scan channels for response from the inverter
+            radio.startListening()
 
-            radio.setChannel(rxChannel)
+            for rxChannelIndex in range(100):
+                rxChannel = rxChannelList[rxChannelIndex % 3]
 
-            endTime = time.time_ns() + HoymilesHmDtu.__RECEIVE_TIMEOUT_MS * 1000000
+                radio.setChannel(rxChannel)
 
-            while time.time_ns() < endTime:
-                if radio.available():
-                    packetLen = radio.getDynamicPayloadSize()
-                    rxBuffer = radio.read(packetLen)
-                    radio.flush_rx()
-                    responseList.append(rxBuffer)
+                endTime = time.time_ns() + HoymilesHmDtu.__RECEIVE_TIMEOUT_MS * 1000000
+
+                while time.time_ns() < endTime:
+                    if radio.available():
+                        # read packet data
+                        packetLen = radio.getDynamicPayloadSize()
+                        packet = radio.read(packetLen)
+                        radio.flush_rx()
+
+                        # store raw packet data
+                        responseList.append(packet)
+
+        finally:
+            gc.enable()
+
+        # undo replace of special characters
+        for idx in range(len(responseList)):
+            responseList[idx] = HoymilesHmDtu.__UnescapeData(responseList[idx])
 
         return responseList
 
-    def __ExtractInverterInfo(self, responseData : bytearray) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
+    @staticmethod
+    def __ExtractInverterInfo(responseData : bytearray, numberOfChannels : int) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
         """ Extracts the inverter infos from the reponse data.
 
         Args:
             responseData (bytearray): The response data.
+            numberOfChannels (int): Number of inverter channels.
 
         Returns:
             bool: True if successfull
@@ -220,22 +286,21 @@ class HoymilesHmDtu:
         """
         # check the checksum
         crc1 = int.from_bytes(responseData[-2:], "big")
-        crc2 = crc.CalculateHoymilesCrc16(responseData, len(responseData) - 2)
+        crc2 = HoymilesHmDtu.__CalculateCrc16(responseData, len(responseData) - 2)
         if crc1 != crc2:
             return False, {}
         
         # extract the data depending on the inverter type
-        if self.__inverterNumberOfChannels == 1:
+        if numberOfChannels == 1:
             return True, HoymilesHmDtu.__ExtractInverterInfoOneChannel(responseData)
 
-        if self.__inverterNumberOfChannels == 2:
+        if numberOfChannels == 2:
             return True, HoymilesHmDtu.__ExtractInverterInfoTwoChannels(responseData)
 
-        # not implemented!
-        # if self.__inverterNumberOfChannels == 4:
-        #     return True, HoymilesHmDtu.__ExtractInverterInfoFourChannels(responseData)
+        if numberOfChannels == 4:
+            return True, HoymilesHmDtu.__ExtractInverterInfoFourChannels(responseData)
         
-        raise Exception(f"Can not extract inverter info. Inverter with {self.__inverterNumberOfChannels} channel(s) not supported!")
+        raise Exception(f"Can not extract inverter info. Inverter with {numberOfChannels} channel(s) not supported!")
 
     @staticmethod
     def __ExtractInverterInfoOneChannel(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
@@ -247,26 +312,26 @@ class HoymilesHmDtu:
         Returns:
             dict[str, float | list[dict[str, float]]]: The inverter infos.
         """
-        info : dict[str, float | list[dict[str, float]]] = {}
         
         channel1 : dict[str, float] = {}
 
-        channel1["DcV"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
-        channel1["DcI"] = int.from_bytes(responseData[4:6], "big") / 100.0          # A
-        channel1["DcP"] = int.from_bytes(responseData[6:8], "big") / 10.0           # W
-        channel1["DcTotalE"] = int.from_bytes(responseData[8:12], "big") / 1000.0   # kWh
-        channel1["DcDayE"] = int.from_bytes(responseData[12:14], "big") / 1.0       # Wh
+        channel1["DC V"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
+        channel1["DC I"] = int.from_bytes(responseData[4:6], "big") / 100.0          # A
+        channel1["DC P"] = int.from_bytes(responseData[6:8], "big") / 10.0           # W
+        channel1["DC E total"] = int.from_bytes(responseData[8:12], "big") / 1000.0  # kWh
+        channel1["DC E day"] = int.from_bytes(responseData[12:14], "big") / 1.0      # Wh
 
-        info["Channel list"] = [channel1]
+        info : dict[str, float | list[dict[str, float]]] = {}
+        info["Channels"] = [channel1]
 
-        info["AcV"] = int.from_bytes(responseData[14:16], "big") / 10.0         # V
-        info["AcF"] = int.from_bytes(responseData[16:18], "big") / 100.0        # Hz
-        info["AcP"] = int.from_bytes(responseData[18:20], "big") / 10.0         # W
-        info["Q"] = int.from_bytes(responseData[20:22], "big") / 10.0           # -
-        info["AcI"] = int.from_bytes(responseData[22:24], "big") / 100.0        # A
-        info["AcPF"] = int.from_bytes(responseData[24:26], "big") / 1000.0      # -
-        info["T"] = int.from_bytes(responseData[26:28], "big") / 10.0           # °C
-        info["EVT"] = int.from_bytes(responseData[28:30], "big") / 1.0          # -
+        info["AC V"] = int.from_bytes(responseData[14:16], "big") / 10.0         # V
+        info["AC F"] = int.from_bytes(responseData[16:18], "big") / 100.0        # Hz
+        info["AC P"] = int.from_bytes(responseData[18:20], "big") / 10.0         # W
+        info["Q"] = int.from_bytes(responseData[20:22], "big") / 10.0            # VAR (W) reactive power
+        info["AC I"] = int.from_bytes(responseData[22:24], "big") / 100.0        # A
+        info["AC PF"] = int.from_bytes(responseData[24:26], "big") / 1000.0      # -
+        info["T"] = int.from_bytes(responseData[26:28], "big") / 10.0            # °C
+        info["EVT"] = int.from_bytes(responseData[28:30], "big") / 1.0           # -
 
         return info
 
@@ -280,70 +345,110 @@ class HoymilesHmDtu:
         Returns:
             dict[str, float | list[dict[str, float]]]: The inverter infos.
         """
-        info : dict[str, float | list[dict[str, float]]] = {}
         
         channel1 : dict[str, float] = {}
 
-        channel1["DcV"] = int.from_bytes(responseData[2:4], "big") / 10.0          # V
-        channel1["DcI"] = int.from_bytes(responseData[4:6], "big") / 100.0         # A
-        channel1["DcP"] = int.from_bytes(responseData[6:8], "big") / 10.0          # W
-        channel1["DcTotalE"] = int.from_bytes(responseData[14:18], "big") / 1000.0 # kWh
-        channel1["DcDayE"] = int.from_bytes(responseData[22:24], "big") / 1.0      # Wh
+        channel1["DC V"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
+        channel1["DC I"] = int.from_bytes(responseData[4:6], "big") / 100.0          # A
+        channel1["DC P"] = int.from_bytes(responseData[6:8], "big") / 10.0           # W
+        channel1["DC E total"] = int.from_bytes(responseData[14:18], "big") / 1000.0 # kWh
+        channel1["DC E day"] = int.from_bytes(responseData[22:24], "big") / 1.0      # Wh
 
         channel2 : dict[str, float] = {}
 
-        channel2["DcV"] = int.from_bytes(responseData[8:10], "big") / 10.0         # V
-        channel2["DcI"] = int.from_bytes(responseData[10:12], "big") / 100.0       # A
-        channel2["DcP"] = int.from_bytes(responseData[12:14], "big") / 10.0        # W
-        channel2["DcTotalE"] = int.from_bytes(responseData[18:22], "big") / 1000.0 # kWh
-        channel2["DcDayE"] = int.from_bytes(responseData[24:26], "big") / 1.0      # Wh
+        channel2["DC V"] = int.from_bytes(responseData[8:10], "big") / 10.0          # V
+        channel2["DC I"] = int.from_bytes(responseData[10:12], "big") / 100.0        # A
+        channel2["DC P"] = int.from_bytes(responseData[12:14], "big") / 10.0         # W
+        channel2["DC E total"] = int.from_bytes(responseData[18:22], "big") / 1000.0 # kWh
+        channel2["DC E day"] = int.from_bytes(responseData[24:26], "big") / 1.0      # Wh
 
-        info["Channel list"] = [channel1, channel2]
+        info : dict[str, float | list[dict[str, float]]] = {}
+        info["Channels"] = [channel1, channel2]
 
-        info["AcV"] = int.from_bytes(responseData[26:28], "big") / 10.0         # V
-        info["AcF"] = int.from_bytes(responseData[28:30], "big") / 100.0        # Hz
-        info["AcP"] = int.from_bytes(responseData[30:32], "big") / 10.0         # W
-        info["Q"] = int.from_bytes(responseData[32:34], "big") / 10.0           # -
-        info["AcI"] = int.from_bytes(responseData[34:36], "big") / 100.0        # A
-        info["AcPF"] = int.from_bytes(responseData[36:38], "big") / 1000.0      # -
-        info["T"] = int.from_bytes(responseData[38:40], "big") / 10.0           # °C
-        info["EVT"] = int.from_bytes(responseData[40:42], "big") / 1.0          # -
+        info["AC V"] = int.from_bytes(responseData[26:28], "big") / 10.0         # V
+        info["AC F"] = int.from_bytes(responseData[28:30], "big") / 100.0        # Hz
+        info["AC P"] = int.from_bytes(responseData[30:32], "big") / 10.0         # W
+        info["Q"] = int.from_bytes(responseData[32:34], "big") / 10.0            # VAR (W) reactive power
+        info["AC I"] = int.from_bytes(responseData[34:36], "big") / 100.0        # A
+        info["AC PF"] = int.from_bytes(responseData[36:38], "big") / 1000.0      # -
+        info["T"] = int.from_bytes(responseData[38:40], "big") / 10.0            # °C
+        info["EVT"] = int.from_bytes(responseData[40:42], "big") / 1.0           # -
 
         return info
 
-    # @staticmethod
-    # def __ExtractInverterInfoFourChannels(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
-    #     """ Extracts inverter infos for inverters with four channels.
+    @staticmethod
+    def __ExtractInverterInfoFourChannels(responseData : bytearray) -> dict[str, float | list[dict[str, float]]]:
+        """ Extracts inverter infos for inverters with four channels.
 
-    #     Args:
-    #         responseData (bytearray): The response data.
+        Args:
+            responseData (bytearray): The response data.
 
-    #     Returns:
-    #         dict[str, float | list[dict[str, float]]]: The inverter infos.
-    #     """
-    #     info : dict[str, float | list[dict[str, float]]] = {}
-        
-    #     channel1 : dict[str, float] = {}
-    #     channel2 : dict[str, float] = {}
-    #     channel3 : dict[str, float] = {}
-    #     channel4 : dict[str, float] = {}
+        Returns:
+            dict[str, float | list[dict[str, float]]]: The inverter infos.
+        """
 
-    #     info["Channel list"] = [channel1, channel2, channel3, channel4]
+        channel1 : dict[str, float] = {}
 
-    #     return info
+        channel1["DC V"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
+        channel1["DC I"] = int.from_bytes(responseData[4:6], "big") / 100.0          # A
+        channel1["DC P"] = int.from_bytes(responseData[8:10], "big") / 10.0          # W
+        channel1["DC E total"] = int.from_bytes(responseData[12:16], "big") / 1000.0 # kWh
+        channel1["DC E day"] = int.from_bytes(responseData[20:22], "big") / 1.0      # Wh
 
-    def __EvaluateInverterInfoResponse(self, responseList : list[bytearray]) -> tuple[bool, bytearray]:
+        channel2 : dict[str, float] = {}
+
+        channel2["DC V"] = int.from_bytes(responseData[2:4], "big") / 10.0           # V
+        channel2["DC I"] = int.from_bytes(responseData[6:8], "big") / 100.0          # A
+        channel2["DC P"] = int.from_bytes(responseData[10:12], "big") / 10.0         # W
+        channel2["DC E total"] = int.from_bytes(responseData[16:20], "big") / 1000.0 # kWh
+        channel2["DC E day"] = int.from_bytes(responseData[22:24], "big") / 1.0      # Wh
+
+        channel3 : dict[str, float] = {}
+
+        channel3["DC V"] = int.from_bytes(responseData[24:26], "big") / 10.0         # V
+        channel3["DC I"] = int.from_bytes(responseData[26:28], "big") / 100.0        # A
+        channel3["DC P"] = int.from_bytes(responseData[30:32], "big") / 10.0         # W
+        channel3["DC E total"] = int.from_bytes(responseData[34:38], "big") / 1000.0 # kWh
+        channel3["DC E day"] = int.from_bytes(responseData[42:44], "big") / 1.0      # Wh
+
+        channel4 : dict[str, float] = {}
+
+        channel4["DC V"] = int.from_bytes(responseData[24:26], "big") / 10.0         # V
+        channel4["DC I"] = int.from_bytes(responseData[28:30], "big") / 100.0        # A
+        channel4["DC P"] = int.from_bytes(responseData[32:34], "big") / 10.0         # W
+        channel4["DC E total"] = int.from_bytes(responseData[38:42], "big") / 1000.0 # kWh
+        channel4["DC E day"] = int.from_bytes(responseData[44:46], "big") / 1.0      # Wh
+
+        info : dict[str, float | list[dict[str, float]]] = {}
+        info["Channels"] = [channel1, channel2, channel3, channel4]
+
+        info["AC V"] = int.from_bytes(responseData[46:48], "big") / 10.0         # V
+        info["AC F"] = int.from_bytes(responseData[48:50], "big") / 100.0        # Hz
+        info["AC P"] = int.from_bytes(responseData[50:52], "big") / 10.0         # W
+        info["Q"] = int.from_bytes(responseData[52:54], "big") / 10.0            # VAR (W) reactive power
+        info["AC I"] = int.from_bytes(responseData[54:56], "big") / 100.0        # A
+        info["AC PF"] = int.from_bytes(responseData[56:58], "big") / 1000.0      # -
+        info["T"] = int.from_bytes(responseData[58:60], "big") / 10.0            # °C
+        info["EVT"] = int.from_bytes(responseData[60:62], "big") / 1.0           # -
+
+        return info
+
+    @staticmethod
+    def __EvaluateInverterInfoResponse(responseList : list[bytearray],
+                                       inverterRadioAddress : bytes, inverterNumberOfChannels : int) -> tuple[bool, bytearray]:
         """ Checks if the responses are valid and returns the assembled data.
 
         Args:
             responseList (list[bytearray]): List of received inverter responses.
+            inverterRadioAddress (bytes): The inverter radio address (4 bytes).
+            inverterNumberOfChannels (int): The number of inverter channels.
 
         Returns:
             bool: True if all responses are valid.
             bytearray: The assembled response data.
         """
         
-        numberOfResponses = self.__inverterNumberOfChannels + 1
+        numberOfResponses = inverterNumberOfChannels + 1
         responseData = bytearray()
 
         # did we get the right number of responses?
@@ -365,11 +470,11 @@ class HoymilesHmDtu:
             # are the receiver addresses valid?
             address1 = response[1:5]
             address2 = response[5:9]
-            if (address1 != self.__inverterRadioAddress) or (address2 != self.__inverterRadioAddress):
+            if (address1 != inverterRadioAddress) or (address2 != inverterRadioAddress):
                 return False, responseData
 
             # is the checksum valid?
-            if not HoymilesHmDtu.CheckChecksum(response):
+            if not HoymilesHmDtu.__CheckChecksum(response):
                 return False, responseData
             
             # header is 10 bytes and last byte is the checksum
@@ -440,7 +545,7 @@ class HoymilesHmDtu:
         return id.to_bytes(4, "big", signed=False)
 
     @staticmethod
-    def CheckChecksum(packet : bytes | bytearray) -> bool:
+    def __CheckChecksum(packet : bytes | bytearray) -> bool:
         """ Checks the checksum of a packet.
 
         Args:
@@ -449,12 +554,12 @@ class HoymilesHmDtu:
         Returns:
             bool: True if the checksum is valid.
         """
-        checksum1 = crc.CalculateHoymilesCrc8(packet, len(packet) - 1)
+        checksum1 = HoymilesHmDtu.__CalculateCrc8(packet, len(packet) - 1)
         checksum2 = packet[-1]
         return checksum1 == checksum2
 
     @staticmethod
-    def EscapeData(input : bytes | bytearray) -> bytearray:
+    def __EscapeData(input : bytes | bytearray) -> bytearray:
         """ Replaces bytes with special meaning by escape sequences.
             0x7D -> 0x7D 0x5D
             0x7E -> 0x7D 0x5E
@@ -485,7 +590,7 @@ class HoymilesHmDtu:
         return output
 
     @staticmethod
-    def UnescapeData(input : bytes | bytearray) -> bytearray:
+    def __UnescapeData(input : bytes | bytearray) -> bytearray:
         """ Undo replace of bytes with special meaning by escape sequences.
 
         Args:
@@ -520,7 +625,7 @@ class HoymilesHmDtu:
         return output
 
     @staticmethod
-    def CreateRequestInfoPacket(receiverAddr : bytes, senderAddr : bytes, currentTime : float) -> bytearray:
+    def __CreateRequestInfoPacket(receiverAddr : bytes, senderAddr : bytes, currentTime : float) -> bytearray:
         """ Creates the packet that can be sent to the inverter to request information.
 
         Args:
@@ -539,18 +644,18 @@ class HoymilesHmDtu:
         packet.extend(payload)
 
         # the payload checksum
-        payloadChecksum = crc.CalculateHoymilesCrc16(payload, len(payload))
+        payloadChecksum = HoymilesHmDtu.__CalculateCrc16(payload, len(payload))
         packet.extend(payloadChecksum.to_bytes(2, "big", signed=False))
 
         # the packet checksum
-        packetChecksum = crc.CalculateHoymilesCrc8(packet, len(packet))
+        packetChecksum = HoymilesHmDtu.__CalculateCrc8(packet, len(packet))
         packet.extend(packetChecksum.to_bytes(1, "big", signed=False))
 
         if len(packet) != 27:
             raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} != 27")
         
         # replace special characters
-        packet = HoymilesHmDtu.EscapeData(packet)
+        packet = HoymilesHmDtu.__EscapeData(packet)
 
         if len(packet) > HoymilesHmDtu.__MAX_PACKET_SIZE:
             raise Exception(f"Internal error CreateRequestInfoPacket: packet size {len(packet)} > MAX_PACKET_SIZE {HoymilesHmDtu.__MAX_PACKET_SIZE}")
@@ -610,22 +715,66 @@ class HoymilesHmDtu:
         
         return payload
     
-    def PrintNrf24l01Info(self) -> None:
-        """ Prints NRF24L01 module information on standard output.
+    @staticmethod
+    def __CalculateCrc8(data : bytes | bytearray, dataLen : int) -> int:
+        """ Calculates CRC8 checksum for communication with hoymiles inverters.
+            poly = 0x101; reversed = False; init-value = 0x00; XOR-out = 0x00; Check = 0x31
+
+        Args:
+            data (bytearray): The byte array on which the ckecksum is to be calculated.
+            dataLen (int): Number of bytes to be used to calculate the checksum.
+
+        Returns:
+            int: The crc checksum.
         """
-        if self.__radio is None:
-            raise Exception("Communication is not initialized!")
+        crc = 0
 
-        self.__radio.print_pretty_details()
+        for idx in range(dataLen):
+            crc ^= data[idx]
+            for _ in range(8):
+                crc <<= 1
+                if crc & 0x0100:
+                    crc ^= 0x01
+                crc &= 0xFF
 
+        return crc
+
+    @staticmethod
+    def __CalculateCrc16(data : bytes | bytearray, dataLen : int) -> int:
+        """ Calculates CRC16 checksum for communication with hoymiles inverters.
+            poly = 0x8005; reversed = True; init-value = 0xFFFF; XOR-out = 0x0000; Check = 0x4B37
+
+        Args:
+            data (bytearray): The byte array on which the ckecksum is to be calculated.
+            dataLen (int): Number of bytes to be used to calculate the checksum.
+
+        Returns:
+            int: The crc checksum.
+        """
+
+        crc = 0xFFFF
+
+        for idx in range(dataLen):
+            crc ^= data[idx]
+            for _ in range(8):
+                if crc & 0x0001:
+                    crc >>= 1
+                    crc ^= 0xA001
+                else:
+                    crc >>= 1
+
+        return crc
+
+###################################################################################################
+# functions for debugging
+###################################################################################################
 
 if __name__ == "__main__":
 
     hm = HoymilesHmDtu("114184020874", 0, 24)
-
     hm.InitializeCommunication()
-
     success, info = hm.QueryInverterInfo()
 
     print(f"success: {success}")
-    print(info)
+    HoymilesHmDtu.PrintInverterInfo(info)
+
