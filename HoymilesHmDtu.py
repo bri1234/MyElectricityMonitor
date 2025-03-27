@@ -52,22 +52,22 @@ class HoymilesHmDtu:
     # the nRF24L01 receive pipeline
     __RX_PIPE_NUM = 1
 
-    # timeout for channel scan
+    # timeout (in ms) for channel scan
     __RECEIVE_TIMEOUT_MS = 5
 
-    # the SPI communication frequency
+    # the SPI communication frequency (in Hz)
     __SPI_FREQUENCY_HZ = 1000000
 
     # the power level to send the request to the receiver
     __RADIO_POWER_LEVEL = nrf.rf24_pa_dbm_e.RF24_PA_MAX
 
-    # time to wait before a new request is sent to the inverter if the previous request was not received
+    # time (in s) to wait before a new request is sent to the inverter if the previous request was not received
     __WAIT_BEFORE_RETRY_S = 3
 
     # maximum size of packets that can be sent with the nRF24L01 module
     __MAX_PACKET_SIZE = 32
 
-    # list of channels where the inverter listen for requests
+    # list of channels where the inverter is listening for requests
     __TX_CHANNELS = [ 3, 23, 40, 61, 75 ]
 
     # list of channels where the inverter sends the responses depending on the channel, where the request was received
