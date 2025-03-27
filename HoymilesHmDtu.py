@@ -99,9 +99,9 @@ class HoymilesHmDtu:
         """ Creates a new Hoymiles HM communication object.
 
         Args:
-            inverterSerialNumber (str): The inverter serial number. (As printed on a sticker on the inverter case.)
+            inverterSerialNumber (str): The inverter serial number. (As printed on the sticker on the inverter case.)
             pinCsn (int, optional): The CSN pin as SPI device number (0 or 1), usually 0. Defaults to 0.
-            pinCe (int, optional): The GPIO pin connected to NRF24L01 signal CE. Defaults to 24.
+            pinCe (int, optional): The GPIO pin connected to the NRF24L01 CE signal. Defaults to 24.
         """
         self.__inverterSerialNumber = inverterSerialNumber
         self.__pinCsn = pinCsn
