@@ -31,6 +31,23 @@ import uuid
 import gc
 import random
 
+# The units for the values querried from the inverter.
+Units = {
+    "DC V" : "V",           # DC voltage
+    "DC I" : "A",           # DC current
+    "DC P" : "W",           # DC power
+    "DC E total" : "kWh",   # DC energy total
+    "DC E day" : "Wh",      # DC energy day
+    "AC V" : "V",           # AC voltage
+    "AC F" : "Hz",          # AC frequency
+    "AC P" : "W",           # AC power
+    "AC Q" : "VAR",         # AC reactive power (W)
+    "AC I" : "A",           # AC current
+    "AC PF" : "",           # AC power factor
+    "T" : "°C",             # temperature
+    "EVT" : ""              # event ???
+}
+
 class HoymilesHmDtu:
     """ Class for communication with HM300, HM350, HM400, HM600, HM700, HM800, HM1200 & HM1500 inverter.
         (DTU means 'data transfer unit'.)
@@ -147,6 +164,34 @@ class HoymilesHmDtu:
     def QueryInverterInfo(self, numberOfRetries : int = 20) -> tuple[bool, dict[str, float | list[dict[str, float]]]]:
         """ Requests info data from the inverter and returns the inverter response.
 
+            Info example (2 channels):
+
+            {
+                "Channels" : [
+                    {
+                        "DC V" : 26.0,
+                        "DC I" : 2.5,
+                        "DC P" : 65.0,
+                        "DC E total" : 123.0,
+                        "DC E day" : 20.0
+                    }, {
+                        "DC V" : 27.0,
+                        "DC I" : 1.5,
+                        "DC P" : 40.5,
+                        "DC E total" : 101.0,
+                        "DC E day" : 42.0
+                    }
+                ],
+                "AC V" : 230.0,
+                "AC F" : 50.0,
+                "AC P" : 75.0,
+                "AC Q" : 0.01,
+                "AC I" : 0.5,
+                "AC PF" : 1.0,
+                "T" : 21.0,
+                "EVT" : 0
+            }
+
         Args:
             numberOfRetries (int): Number of requests before giving up.
 
@@ -210,10 +255,10 @@ class HoymilesHmDtu:
                     print(f"Channel {channelIndex + 1}")
 
                     for k in value[channelIndex].keys():
-                        print(f"    {k} = {value[channelIndex][k]}")
+                        print(f"    {k} = {value[channelIndex][k]} {Units[k]}")
 
             else:
-                print(f"{key} = {info[key]}")
+                print(f"{key} = {info[key]} {Units[key]}")
 
     def PrintNrf24l01Info(self) -> None:
         """ Prints NRF24L01 module information on standard output.
@@ -333,7 +378,7 @@ class HoymilesHmDtu:
         info["AC V"] = int.from_bytes(responseData[14:16], "big") / 10.0         # V
         info["AC F"] = int.from_bytes(responseData[16:18], "big") / 100.0        # Hz
         info["AC P"] = int.from_bytes(responseData[18:20], "big") / 10.0         # W
-        info["Q"] = int.from_bytes(responseData[20:22], "big") / 10.0            # VAR (W) reactive power
+        info["AC Q"] = int.from_bytes(responseData[20:22], "big") / 10.0         # VAR (W) reactive power
         info["AC I"] = int.from_bytes(responseData[22:24], "big") / 100.0        # A
         info["AC PF"] = int.from_bytes(responseData[24:26], "big") / 1000.0      # -
         info["T"] = int.from_bytes(responseData[26:28], "big") / 10.0            # °C
@@ -374,7 +419,7 @@ class HoymilesHmDtu:
         info["AC V"] = int.from_bytes(responseData[26:28], "big") / 10.0         # V
         info["AC F"] = int.from_bytes(responseData[28:30], "big") / 100.0        # Hz
         info["AC P"] = int.from_bytes(responseData[30:32], "big") / 10.0         # W
-        info["Q"] = int.from_bytes(responseData[32:34], "big") / 10.0            # VAR (W) reactive power
+        info["AC Q"] = int.from_bytes(responseData[32:34], "big") / 10.0         # VAR (W) reactive power
         info["AC I"] = int.from_bytes(responseData[34:36], "big") / 100.0        # A
         info["AC PF"] = int.from_bytes(responseData[36:38], "big") / 1000.0      # -
         info["T"] = int.from_bytes(responseData[38:40], "big") / 10.0            # °C
@@ -431,7 +476,7 @@ class HoymilesHmDtu:
         info["AC V"] = int.from_bytes(responseData[46:48], "big") / 10.0         # V
         info["AC F"] = int.from_bytes(responseData[48:50], "big") / 100.0        # Hz
         info["AC P"] = int.from_bytes(responseData[50:52], "big") / 10.0         # W
-        info["Q"] = int.from_bytes(responseData[52:54], "big") / 10.0            # VAR (W) reactive power
+        info["AC Q"] = int.from_bytes(responseData[52:54], "big") / 10.0         # VAR (W) reactive power
         info["AC I"] = int.from_bytes(responseData[54:56], "big") / 100.0        # A
         info["AC PF"] = int.from_bytes(responseData[56:58], "big") / 1000.0      # -
         info["T"] = int.from_bytes(responseData[58:60], "big") / 10.0            # °C
