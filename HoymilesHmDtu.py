@@ -223,15 +223,20 @@ class HoymilesHmDtu:
                 # create packet to send to the inverter
                 txPacket = HoymilesHmDtu.__CreateRequestInfoPacket(self.__inverterRadioAddress, self.__dtuRadioAddress, time.time())
                 
-                # send request and scan for responses
-                responseList = HoymilesHmDtu.__SendRequestAndScanForResponses(radio, txChannel, rxChannelList, txPacket)
+                try:
+                    # send request and scan for responses
+                    responseList = HoymilesHmDtu.__SendRequestAndScanForResponses(radio, txChannel, rxChannelList, txPacket)
 
-                # did we get a valid response?
-                success, responseData = HoymilesHmDtu.__EvaluateInverterInfoResponse(responseList, self.__inverterRadioAddress, self.__inverterNumberOfChannels)
-                if success:
-                    success, info = HoymilesHmDtu.__ExtractInverterInfo(responseData, self.__inverterNumberOfChannels)
+                    # did we get a valid response?
+                    success, responseData = HoymilesHmDtu.__EvaluateInverterInfoResponse(responseList, self.__inverterRadioAddress, self.__inverterNumberOfChannels)
                     if success:
-                        return True, info
+                        success, info = HoymilesHmDtu.__ExtractInverterInfo(responseData, self.__inverterNumberOfChannels)
+                        if success:
+                            return True, info
+                        
+                except:
+                    # not successful, try again
+                    pass
 
         finally:
             radio.setPALevel(nrf.rf24_pa_dbm_e.RF24_PA_MIN)
