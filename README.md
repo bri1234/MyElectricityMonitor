@@ -91,8 +91,8 @@ python3 -m pip install pyserial
 | 81 81 C7 82 03 FF | Hersteller-Identifikation     | Hersteller-Kennung und Gerätetyp mit Software Version: /EBZ5DD3BZ06ETA_107 |
 | 01 00 00 00 09 FF | Geräte-Identifikation         | Nach DIN 43863-5 z.B.: 1EBZ0100000024 |
 | 01 00 01 08 00 FF | Zählerstand zu +A, tariflos   | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
-| 01 00 01 08 01 FF | Zählerstand zu +A, Tarif 1    | Auflösung 1 W*h (6 Vorkomma- und 3 Nachkommastellen) |
-| 01 00 01 08 02 FF | Zählerstand zu +A, Tarif 2    | Auflösung 1 W*h (6 Vorkomma- und 3 Nachkommastellen) |
+| 01 00 01 08 01 FF | Zählerstand zu +A, Tarif 1    | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
+| 01 00 01 08 02 FF | Zählerstand zu +A, Tarif 2    | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
 | 01 00 02 08 00 FF | Zählerstand zu -A, tariflos   | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) | 
 | 01 00 10 07 00 FF | Summe der Momentan-Leistungen in allen Phasen | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
 | 01 00 24 07 00 FF | Momentane Leistung in Phase L1 | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
