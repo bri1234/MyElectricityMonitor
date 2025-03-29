@@ -63,5 +63,17 @@ sudo raspi-config
 
 "Would you like the SPI interface to be enabled?" -> "YES"
 
+### Raspberry PI Python GPIO module: gpiozero
+
+sudo python3 -m pip install gpiozero
+
+### Raspebrry PI Python module for nRF24L01+: pyrf24
+
+This Python code needs the pyrf24 module for communication. Install the module with the following line:
+
+python3 -m pip install pyrf24
+
+(see https://github.com/nRF24/pyRF24)
+
 
 
