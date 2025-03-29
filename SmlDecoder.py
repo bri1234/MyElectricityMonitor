@@ -75,8 +75,6 @@ def __DecodeValue(data : bytearray, pos : int) -> tuple[bytes | bool | int | lis
     valueStartPos = pos + tlFieldSize
     valueEndPos = pos + dataLen
 
-    # __PrintDebug(data, pos, dataType, dataLen, tlFieldSize)
-
     value : bytes | bool | int | list[Any]
     endOfMsg = False
 
@@ -194,24 +192,6 @@ def PrintValue(value : bytes | bool | int | list[Any], indent : int = 0) -> None
     else:
         raise Exception(f"Invalid value: {value}")
 
-def __LoadHexDataFromString(hexData : str) -> bytearray:
-    """ Converts hex bytes in a string to an array oif bytes.
-
-    Args:
-        hexData (str): The hex byte string in the form "A5 42 FF ...".
-
-    Returns:
-        bytearray: the converted byte array.
-    """
-
-    byteArr = bytearray()
-
-    strArr = hexData.split(" ")
-    for s in strArr:
-        byteArr.append(int(s, 16))
-
-    return byteArr
-
 __CRC16_X25_TABLE = [
 	0x0000, 0x1189, 0x2312, 0x329B, 0x4624, 0x57AD,	0x6536, 0x74BF,
 	0x8C48, 0x9DC1, 0xAF5A, 0xBED3, 0xCA6C, 0xDBE5, 0xE97E, 0xF8F7,
@@ -263,71 +243,4 @@ def __CalculateSmlCrc16(data : bytes | bytearray, dataLen : int) -> int:
 
 	crcsum ^= 0xffff
 	return crcsum
-
-###################################################################################################
-# functions for debugging
-###################################################################################################
-
-if __name__ == "__main__":
-
-    testData = [
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 D5 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 32 DE 00 76 05 00 95 A0 D6 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 35 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9B 6E 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5B 8E 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 85 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 85 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 88 D6 00 76 05 00 95 A0 D7 62 00 62 00 72 65 00 00 02 01 71 01 63 76 07 00 00 00 00 1B 1B 1B 1B 1A 03 4E 67",
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 DB 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 27 AC 00 76 05 00 95 A0 DC 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 36 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9B CA 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5B EA 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 4B 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 4B 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 56 AB 00 76 05 00 95 A0 DD 62 00 62 00 72 65 00 00 02 01 71 01 63 44 21 00 00 00 00 1B 1B 1B 1B 1A 03 DE 02",
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 E1 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 D8 CF 00 76 05 00 95 A0 E2 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 37 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9C 30 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5C 50 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 6E 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 6E 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 EA FE 00 76 05 00 95 A0 E3 62 00 62 00 72 65 00 00 02 01 71 01 63 B2 FE 00 00 00 00 1B 1B 1B 1B 1A 03 71 58",
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 E7 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 07 23 00 76 05 00 95 A0 E8 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 38 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9C 93 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5C B3 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 66 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 66 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 C0 EF 00 76 05 00 95 A0 E9 62 00 62 00 72 65 00 00 02 01 71 01 63 80 D8 00 00 00 00 1B 1B 1B 1B 1A 03 3B 6A", 
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 ED 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 77 1E 00 76 05 00 95 A0 EE 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 39 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9C F5 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5D 15 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 5E 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 5E 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 81 76 00 76 05 00 95 A0 EF 62 00 62 00 72 65 00 00 02 01 71 01 63 6E C5 00 00 00 00 1B 1B 1B 1B 1A 03 C0 EA", 
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 F3 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 E7 59 00 76 05 00 95 A0 F4 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 3A 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9D 60 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5D 80 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 83 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 83 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 54 B7 00 76 05 00 95 A0 F5 62 00 62 00 72 65 00 00 02 01 71 01 63 8C B9 00 00 00 00 1B 1B 1B 1B 1A 03 57 44", 
-        "1B 1B 1B 1B 01 01 01 01 76 05 00 95 A0 F9 62 00 62 00 72 65 00 00 01 01 76 01 01 07 65 42 5A 44 44 33 0B 09 01 45 42 5A 01 00 2D 16 C3 01 01 63 97 64 00 76 05 00 95 A0 FA 62 00 62 00 72 65 00 00 07 01 77 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 72 62 01 65 00 18 F1 3B 7A 77 07 81 81 C7 82 03 FF 01 01 01 01 04 45 42 5A 01 77 07 01 00 00 00 09 FF 01 01 01 01 0B 09 01 45 42 5A 01 00 2D 16 C3 01 77 07 01 00 01 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 08 BA 13 9D BA 01 77 07 01 00 01 08 01 FF 01 01 62 1E 52 FB 69 00 00 00 08 B4 25 5D DA 01 77 07 01 00 01 08 02 FF 01 01 62 1E 52 FB 69 00 00 00 00 05 EE 3F E0 01 77 07 01 00 02 08 00 FF 64 01 01 80 01 62 1E 52 FB 69 00 00 00 00 0D 18 5B 20 01 77 07 01 00 10 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 45 01 77 07 01 00 24 07 00 FF 01 01 62 1B 52 FE 55 00 00 01 45 01 77 07 01 00 38 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 77 07 01 00 4C 07 00 FF 01 01 62 1B 52 FE 55 00 00 00 00 01 01 01 63 05 8B 00 76 05 00 95 A0 FB 62 00 62 00 72 65 00 00 02 01 71 01 63 0A 89 00 00 00 00 1B 1B 1B 1B 1A 03 AB B4" 
-    ]
-
-    for d in testData:
-        data = __LoadHexDataFromString(d)
-        messageList = DecodeSmlMessages(data)
-        
-        for msg in messageList:
-            PrintValue(msg)
-
-def __PrintDebug(data : bytearray, pos : int, dataType : int, dataLen : int, tlFieldSize : int) -> None: # type: ignore
-    """ Debug output for value type parsing.
-
-    Args:
-        data (bytearray): The raw SML binary data.
-        pos (int): The position of the type length field.
-        dataType (int): Parsed data type.
-        dataLen (int): Parsed data length.
-        tlFieldSize (int): Parsed type length field size.
-    """
-    if data[pos] == 0:
-        print(f"Pos: {pos} END_OF_MSG")
-        return
-    
-    tlfStr = " ".join(f'{a:02X}' for a in data[pos:pos + tlFieldSize])
-
-    print(f"Pos: {pos} Type: {__ValueTypeToStr(dataType)} Len: {dataLen} TLF: {tlfStr}")
-    if dataType == __DATA_TYPE_LIST:
-        print(f"    {tlfStr}")
-    else:
-        print(f"    {' '.join(f'{a:02X}' for a in data[pos:pos + dataLen])}")
-
-def __ValueTypeToStr(valueType : int) -> str:
-    """ Converts value type to string.
-
-    Args:
-        valueType (int): The value type.
-
-    Returns:
-        str: The value type as a string.
-    """
-    if valueType == 0:
-        return "String"
-    if valueType == 4:
-        return "Bool"
-    if valueType == 5:
-        return "Int"
-    if valueType == 6:
-        return "UInt"
-    if valueType == 7:
-        return "List"
-    
-    return "???"
 
