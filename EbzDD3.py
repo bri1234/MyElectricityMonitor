@@ -31,6 +31,18 @@ import time
 import gc
 from typing import Any
 
+# Units for the meter readings
+# "+A"      = meter reading +A, tariff-free in kWh
+# "+A T1"   = meter reading +A, tariff 1 in kWh
+# "+A T2"   = meter reading +A, tariff 2 in kWh
+# "-A"      = meter reading -A, tariff-free in kWh
+# "P"       = Sum of instantaneous power in all phases in W
+# "P L1"    = Instantaneous power phase L1 in W
+# "P L2"    = Instantaneous power phase L2 in W
+# "P L3"    = Instantaneous power phase L3 in W
+# +A: Active energy, grid supplies to customer.
+# -A: Active energy, customer supplies to grid
+
 Units = {
     "+A": "kWh",
     "+A T1": "kWh",
@@ -144,42 +156,59 @@ class EbzDD3:
     
     @staticmethod
     def __ExtractInfoFromDataSet(dataSet : Any) -> tuple[str | None, float | None]:
+        """ Extracts meter reading from one dataset.
+
+        Args:
+            dataSet (Any): the data for one reading
+
+        Returns:
+            str | None: name of the reading
+            float | None]: reading value
+        """
 
         id = dataSet[0]
         value = dataSet[5]
 
-        # +A: Wirkenergie, Netz liefert an Kunden
-        # -A: Wirkenergie, Kunde liefert an Netz
+        # +A: Active energy, grid supplies to customer.
+        # -A: Active energy, customer supplies to grid
 
         if id == b'\x01\x00\x01\x08\x00\xFF':
-            return "+A", value / 1E8            # Zählerstand zu +A, tariflos in kWh
+            return "+A", value / 1E8            # meter reading +A, tariff-free in kWh
         
         if id == b'\x01\x00\x01\x08\x01\xFF':
-            return "+A T1", value / 1E8         # Zählerstand zu +A, Tarif 1 in kWh
+            return "+A T1", value / 1E8         # meter reading +A, tariff 1 in kWh
         
         if id == b'\x01\x00\x01\x08\x02\xFF':
-            return "+A T2", value / 1E8         # Zählerstand zu +A, Tarif 2 in kWh
+            return "+A T2", value / 1E8         # meter reading +A, tariff 2 in kWh
         
         if id == b'\x01\x00\x02\x08\x00\xFF':
-            return "-A", value / 1E8            # Zählerstand zu -A, tariflos in kWh
+            return "-A", value / 1E8            # meter reading -A, tariff-free in kWh
         
         if id == b'\x01\x00\x10\x07\x00\xFF':
-            return "P", value / 1E2             # Summe der Momentan-Leistungen in allen Phasen in W
+            return "P", value / 1E2             # Sum of instantaneous power in all phases in W
         
         if id == b'\x01\x00\x24\x07\x00\xFF':
-            return "P L1", value / 1E2          # Momentane Leistung in Phase L1 in W
+            return "P L1", value / 1E2          # Instantaneous power phase L1 in W
         
         if id == b'\x01\x00\x38\x07\x00\xFF':
-            return "P L2", value / 1E2          # Momentane Leistung in Phase L2 in W
+            return "P L2", value / 1E2          # Instantaneous power phase L2 in W
         
         if id == b'\x01\x00\x4C\x07\x00\xFF':
-            return "P L3", value / 1E2          # Momentane Leistung in Phase L3 in W
+            return "P L3", value / 1E2          # Instantaneous power phase L3 in W
         
         return None, None
 
     
     @staticmethod
     def __ExtractInfoFromData(data : bytearray) -> dict[str, float]:
+        """ Extracts meter readings from the received raw data.
+
+        Args:
+            data (bytearray): The received raw data.
+
+        Returns:
+            dict[str, float]: The meter readinds.
+        """
 
         messageList = sml.DecodeSmlMessages(data)
 
@@ -196,6 +225,39 @@ class EbzDD3:
         return info
 
     def ReceiveInfo(self, channelNum : int) -> dict[str, float]:
+        """ Receives the information from a electricity meter. (The meter readings.)
+
+            Example:
+
+            {
+                "+A": 849.45,
+                "+A T1": 848.46,
+                "+A T2" : 0.995,
+                "-A" : 2.197,
+                "P" : 3200.17,
+                "P L1" : 1014.71,
+                "P L2" :  = 1026.48,
+                "P L3" : 1158.98
+            }
+
+            +A: Active energy, grid supplies to customer.
+            -A: Active energy, customer supplies to grid
+
+            "+A"      = meter reading +A, tariff-free in kWh
+            "+A T1"   = meter reading +A, tariff 1 in kWh
+            "+A T2"   = meter reading +A, tariff 2 in kWh
+            "-A"      = meter reading -A, tariff-free in kWh
+            "P"       = Sum of instantaneous power in all phases in W
+            "P L1"    = Instantaneous power phase L1 in W
+            "P L2"    = Instantaneous power phase L2 in W
+            "P L3"    = Instantaneous power phase L3 in W
+
+        Args:
+            channelNum (int): The channel = the electricity meter 0 or 1.
+
+        Returns:
+            dict[str, float]: The electricity meter information.
+        """
 
         data = self.__ReceiveInfoData(channelNum)
         info = EbzDD3.__ExtractInfoFromData(data)
@@ -203,6 +265,11 @@ class EbzDD3:
     
     @staticmethod
     def PrintInfo(info : dict[str, float]) -> None:
+        """ Prints information got with function ReceiveInfo() in human readable form.
+
+        Args:
+            info (dict[str, float]): The information got with function ReceiveInfo().
+        """
 
         for key in info.keys():
             print(f"{key} = {info[key]} {Units[key]}")

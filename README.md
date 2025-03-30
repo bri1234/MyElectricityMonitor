@@ -83,18 +83,19 @@ python3 -m pip install pyserial
 
 ## eBZ DD3 supported infos
 
-+A: Wirkenergie, Netz liefert an Kunden
--A: Wirkenergie, Kunde liefert an Netz
++A: Active energy, grid supplies to customer.
+-A: Active energy, customer supplies to grid
 
-| Data type         | Name                          | Comment       |
-|-------------------|-------------------------------|---------------|
-| 81 81 C7 82 03 FF | Hersteller-Identifikation     | Hersteller-Kennung und Gerätetyp mit Software Version: /EBZ5DD3BZ06ETA_107 |
-| 01 00 00 00 09 FF | Geräte-Identifikation         | Nach DIN 43863-5 z.B.: 1EBZ0100000024 |
-| 01 00 01 08 00 FF | Zählerstand zu +A, tariflos   | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
-| 01 00 01 08 01 FF | Zählerstand zu +A, Tarif 1    | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
-| 01 00 01 08 02 FF | Zählerstand zu +A, Tarif 2    | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) |
-| 01 00 02 08 00 FF | Zählerstand zu -A, tariflos   | Auflösung 10 μW*h (6 Vorkomma- und 8 Nachkommastellen) | 
-| 01 00 10 07 00 FF | Summe der Momentan-Leistungen in allen Phasen | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
-| 01 00 24 07 00 FF | Momentane Leistung in Phase L1 | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
-| 01 00 38 07 00 FF | Momentane Leistung in Phase L2 | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
-| 01 00 4C 07 00 FF | Momentane Leistung in Phase L3 | Auflösung 0,01W (5 Vorkomma- und 2 Nachkommastellen) |
+| Data type         | Name                           | Comment                                       |
+|-------------------|--------------------------------|-----------------------------------------------|
+| 81 81 C7 82 03 FF | manufacturer ID                | Manufacturer ID and device type with software version, e.g. /EBZ5DD3BZ06ETA_107 |
+| 01 00 00 00 09 FF | device type                    | according to DIN 43863-5, e.g. 1EBZ0100000024 |
+| 01 00 01 08 00 FF | meter reading +A, tariff-free  | unit/resolution 10 μW*h                       |
+| 01 00 01 08 01 FF | meter reading +A, tariff 1     | unit/resolution 10 μW*h                       |
+| 01 00 01 08 02 FF | meter reading +A, tariff 2     | unit/resolution 10 μW*h                       |
+| 01 00 02 08 00 FF | meter reading -A, tariff-free  | unit/resolution 10 μW*h                       |
+| 01 00 10 07 00 FF | Sum of instantaneous power in all phases | unit/resolution 0,01W               |
+| 01 00 24 07 00 FF | Instantaneous power phase L1   | unit/resolution 0,01W                         |
+| 01 00 38 07 00 FF | Instantaneous power phase L2   | unit/resolution 0,01W                         |
+| 01 00 4C 07 00 FF | Instantaneous power phase L3   | unit/resolution 0,01W                         |
+
