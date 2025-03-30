@@ -1,18 +1,18 @@
 # MyElectricityMonitor
 
-My electricity monitor using two DD3 electricity meters and one HM-600 solar inverter.
+My electricity monitor using two eBZ DD3 electricity meters and one HM-600 solar inverter.
 
 # Hardware
 
 Electricity meter:
-2 x EbzDD3              (interface IR-UART)
+2 x eBZ DD3             (interface IR-UART)
 
 Solar inverter:
 1 x Hoymiles HM-600     (interface radio nRF24L01+)
 
 ## Switch for two electricity meters
 
-This is the signal switch used two connect two electricity meters to one **UART**.
+This is the signal switch used two connect two electricity meters to one Raspberry PI **UART**.
 
 ![Electricity meter signal switch circuit](TwoEnergyMetersSwitch.png)
 
@@ -25,7 +25,7 @@ This is the signal switch used two connect two electricity meters to one **UART*
 | 10      | RXD, GPIO 15 (Input) | RX (Output)           |
 | 11      | GPIO 17 (Output)     | Switch Select (Input) |
 
-GPIO is used to switch between two electricity meters.
+GPIO 17 is used to switch between two electricity meters.
 
 ## Solar inverter nRF24L01+ Raspberry PI pin connections
 
@@ -79,9 +79,9 @@ python3 -m pip install pyrf24
 
 python3 -m pip install pyserial
 
-# Infos
+# Information and meter readings
 
-## eBZ DD3 supported infos
+## eBZ DD3 meter readings
 
 +A: Active energy, grid supplies to customer.
 -A: Active energy, customer supplies to grid
