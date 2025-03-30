@@ -87,7 +87,7 @@ class Database:
                            + columnsStr
                            + ') STRICT')
 
-    def InsertDataElectricityMeter(self, electricityMeterNum : int, readings : dict[str, float]) -> None:
+    def InsertReadingsElectricityMeter(self, electricityMeterNum : int, readings : dict[str, float]) -> None:
         """ Stores the electricity meter readings into the database.
 
         Args:
@@ -106,7 +106,7 @@ class Database:
         sql = f'INSERT INTO ElectricityMeter{electricityMeterNum} ("time",{columnsStr}) VALUES ({tm},{valuesStr})'
         self.__connection.execute(sql)
 
-    def InsertDataInverter(self, readings : dict[str, float | list[dict[str, float]]]) -> None:
+    def InsertReadingsInverter(self, readings : dict[str, float | list[dict[str, float]]]) -> None:
         """ Stores the solar inverter readings into the database.
 
         Args:

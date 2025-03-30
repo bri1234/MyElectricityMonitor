@@ -224,7 +224,7 @@ class EbzDD3:
 
         return info
 
-    def ReceiveInfo(self, channelNum : int) -> dict[str, float]:
+    def ReceiveInfo(self, channelNum : int) -> tuple[bool, dict[str, float]]:
         """ Receives the information from a electricity meter. (The meter readings.)
 
             Example:
@@ -259,9 +259,16 @@ class EbzDD3:
             dict[str, float]: The electricity meter information.
         """
 
-        data = self.__ReceiveInfoData(channelNum)
-        info = EbzDD3.__ExtractInfoFromData(data)
-        return info
+        try:
+            data = self.__ReceiveInfoData(channelNum)
+            if len(data) == 0:
+                return False, {}
+            
+            info = EbzDD3.__ExtractInfoFromData(data)
+            return True, info
+    
+        except:
+            return False, {}
     
     @staticmethod
     def PrintInfo(info : dict[str, float]) -> None:
