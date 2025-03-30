@@ -36,7 +36,7 @@ def MainLoop() -> None:
 
     em = EbzDD3()
     hm = HoymilesHmDtu("114184020874", HM_CSN, HM_CE)
-    db = Database("readings.db")
+    db = Database("readings.db", numberOfInverterChannels=2)
 
     hm.InitializeCommunication()
     

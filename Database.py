@@ -39,14 +39,22 @@ class Database:
     __READINGS_INVERTER = ["AC V", "AC I", "AC F", "AC P", "AC Q", "AC PF", "T"]
     __columnsInverter : list[str]
 
-    def __init__(self, fileName : str) -> None:
+    __numberOfInverterChannels : int
+
+    def __init__(self, fileName : str, numberOfInverterChannels : int) -> None:
         """ Creates a new instance of the database object.
 
         Args:
             fileName (str): The filename of the SQLite database. If the database does not exists a new one will be created.
+            numberOfInverterChannels (int): number of inverter channels = number of solar panels.
         """
-        self.__columnsInverter = [ f"CH0 {reading}" for reading in Database.__READINGS_INVERTER_CHANNEL ]
-        self.__columnsInverter.extend([ f"CH1 {reading}" for reading in Database.__READINGS_INVERTER_CHANNEL ])
+        self.__numberOfInverterChannels = numberOfInverterChannels
+
+        self.__columnsInverter = []
+
+        for channel in range(numberOfInverterChannels):
+            self.__columnsInverter.extend([ f"CH{channel} {reading}" for reading in Database.__READINGS_INVERTER_CHANNEL ])
+
         self.__columnsInverter.extend(Database.__READINGS_INVERTER)
 
         self.__connection = sqlite3.connect(fileName)
@@ -117,8 +125,10 @@ class Database:
         if not isinstance(readingsCh, list):
             raise Exception('Data format error: readings are not valid inverter data! missing "Channels"')
         
-        values = [ str(readingsCh[0][key]) for key in Database.__READINGS_INVERTER_CHANNEL ]
-        values.extend([ str(readingsCh[1][key]) for key in Database.__READINGS_INVERTER_CHANNEL ])
+        values : list[str] = []
+        for channel in range(self.__numberOfInverterChannels):
+            values.extend([ str(readingsCh[channel][key]) for key in Database.__READINGS_INVERTER_CHANNEL ])
+
         values.extend([ str(readings[key]) for key in Database.__READINGS_INVERTER ])
         valuesStr = ','.join(values)
 
