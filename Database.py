@@ -51,7 +51,7 @@ class Database:
 
         self.__connection = sqlite3.connect(fileName)
 
-        Database.__CreateTablesIfNotExists(self.__connection)
+        self.__CreateTablesIfNotExists()
 
     def Cleanup(self) -> None:
         """ Closes the database.
@@ -60,45 +60,43 @@ class Database:
         if self.__connection:
             self.__connection.close()
 
-    @staticmethod
-    def __CreateTablesIfNotExists(connection : sqlite3.Connection) -> None:
+    def __CreateTablesIfNotExists(self) -> None:
         """ Creates all data tables in the database if the table does not already exists.
 
         Args:
             connection (sqlite3.Connection): The SQLite connection.
         """
 
-        # create inverter data table
-        columnsStr = ', '.join([f'"{column}" REAL' for column in Database.__columnsInverter])
+        connection = self.__connection
 
-        connection.execute('CREATE TABLE IF NOT EXISTS Inverter ("time" INT NOT NULL PRIMARY KEY,'
-                           + columnsStr
-                           + ') STRICT')
+        # create inverter data table
+        columnsStr = ', '.join([f'"{column}" REAL' for column in self.__columnsInverter])
+
+        sql = f'CREATE TABLE IF NOT EXISTS Inverter ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        connection.execute(sql)
         
         # create electricity meter 1 data table
         columnsStr = ', '.join([f'"{column}" REAL' for column in Database.__COLUMNS_ELECTRICITY_METER])
 
-        connection.execute('CREATE TABLE IF NOT EXISTS ElectricityMeter1 ("time" INT NOT NULL PRIMARY KEY,'
-                           + columnsStr
-                           + ') STRICT')
+        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter0 ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        connection.execute(sql)
         
         # create electricity meter 2 data table
-        connection.execute('CREATE TABLE IF NOT EXISTS ElectricityMeter2 ("time" INT NOT NULL PRIMARY KEY,'
-                           + columnsStr
-                           + ') STRICT')
+        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter1 ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        connection.execute(sql)
 
     def InsertReadingsElectricityMeter(self, electricityMeterNum : int, readings : dict[str, float]) -> None:
         """ Stores the electricity meter readings into the database.
 
         Args:
-            electricityMeterNum (int): The electricity meter 1 or 2.
+            electricityMeterNum (int): The electricity meter 0 or 1.
             readings (dict[str, float]): The electricity meter readings.
         """
 
-        if electricityMeterNum < 1 or electricityMeterNum > 2:
+        if electricityMeterNum < 0 or electricityMeterNum > 1:
             raise Exception(f"Invalid electricity meter number {electricityMeterNum}")
         
-        columnsStr = ','.join(Database.__COLUMNS_ELECTRICITY_METER)
+        columnsStr = ','.join( [ f'"{key}"' for key in Database.__COLUMNS_ELECTRICITY_METER ] )
         valuesStr = ','.join([ str(readings[key]) for key in Database.__COLUMNS_ELECTRICITY_METER ])
 
         tm = int(time.time())
@@ -113,7 +111,7 @@ class Database:
             readings (dict[str, float]): The solar inverter readings.
         """
 
-        columnsStr = ','.join(Database.__columnsInverter)
+        columnsStr = ','.join( [ f'"{key}"' for key in self.__columnsInverter ] )
 
         readingsCh = readings["Channels"]
         if not isinstance(readingsCh, list):

@@ -29,27 +29,32 @@ from HoymilesHmDtu import HoymilesHmDtu
 from Database import Database
 import time
 
-HM_CSn = 0
+HM_CSN = 0
 HM_CE = 24
 
 def MainLoop() -> None:
 
     em = EbzDD3()
-    hm = HoymilesHmDtu("114184020874", HM_CSn, HM_CE)
+    hm = HoymilesHmDtu("114184020874", HM_CSN, HM_CE)
     db = Database("readings.db")
 
+    hm.InitializeCommunication()
+    
     for _ in range(60):
         success, infoEm = em.ReceiveInfo(0)
         if success:
             db.InsertReadingsElectricityMeter(0, infoEm)
+            EbzDD3.PrintInfo(infoEm)
 
         success, infoEm = em.ReceiveInfo(1)
         if success:
             db.InsertReadingsElectricityMeter(1, infoEm)
+            EbzDD3.PrintInfo(infoEm)
 
         success, infoHm = hm.QueryInverterInfo()
         if success:
             db.InsertReadingsInverter(infoHm)
+            HoymilesHmDtu.PrintInverterInfo(infoHm)
 
         time.sleep(30)
 
