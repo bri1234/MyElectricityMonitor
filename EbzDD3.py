@@ -58,19 +58,20 @@ class EbzDD3:
     """ Class to query information from eBZ DD3 electricity meters.
     """
 
-    __SERIAL_PORT = "/dev/serial0"
+    __serialPort : str
     __GPIO_SWITCH = 17
 
     __channelSwitch : gpiozero.DigitalOutputDevice
     __serial : serial.Serial
 
-    def __init__(self) -> None:
+    def __init__(self, serialPort : str = "/dev/ttyAMA0") -> None:
         """ Creates a new instance of the electricity meter reader.
         """
+        self.__serialPort = serialPort
         self.__channelSwitch = gpiozero.DigitalOutputDevice(EbzDD3.__GPIO_SWITCH)
         self.__selectChannel(0)
 
-        self.__serial = serial.Serial(self.__SERIAL_PORT, 9600, timeout=0.1)
+        self.__serial = serial.Serial(self.__serialPort, 9600, timeout=0.1)
 
     def __selectChannel(self, channelNum : int) -> None:
         """ Selects the channel (= the electricity meter) to read from.

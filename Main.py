@@ -55,7 +55,7 @@ def MainLoop() -> None:
     """
 
     db = Database(DATABASE_FILEPATH, DATABASE_NUMBER_OF_INVERTER_CHANNELS)
-    em = EbzDD3()
+    em = EbzDD3("/dev/ttyAMA0")
     hm = HoymilesHmDtu(HM_SERIAL_NUMBER, HM_CSN, HM_CE)
 
     hm.InitializeCommunication()
@@ -72,25 +72,26 @@ def CollectData(database : Database, electricityMeter : EbzDD3, inverter : Hoymi
         electricityMeter (EbzDD3): The electricity meter.
         inverter (HoymilesHmDtu): The inverter.
     """
-    success, infoEm = electricityMeter.ReceiveInfo(0)
+    success, infoEm0 = electricityMeter.ReceiveInfo(0)
     if success:
-        database.InsertReadingsElectricityMeter(0, infoEm)
-        EbzDD3.PrintInfo(infoEm)
+        EbzDD3.PrintInfo(infoEm0)
+        database.InsertReadingsElectricityMeter(0, infoEm0)
 
-    success, infoEm = electricityMeter.ReceiveInfo(1)
+    success, infoEm1 = electricityMeter.ReceiveInfo(1)
     if success:
-        database.InsertReadingsElectricityMeter(1, infoEm)
-        EbzDD3.PrintInfo(infoEm)
+        EbzDD3.PrintInfo(infoEm1)
+        database.InsertReadingsElectricityMeter(1, infoEm1)
 
     # collect the inverter data only when the sun shines
     dawn, dusk = __GetDawnAndDuskTime()
-    if dawn < datetime.now() < dusk:
+    now = datetime.now(dawn.tzinfo)
+    if dawn < now < dusk:
         success, infoHm = inverter.QueryInverterInfo()
         if success:
-            database.InsertReadingsInverter(infoHm)
             HoymilesHmDtu.PrintInverterInfo(infoHm)
+            database.InsertReadingsInverter(infoHm)
 
-__currentDate : date
+__currentDate : date | None = None
 __dawn : datetime
 __dusk : datetime
 
@@ -100,7 +101,7 @@ def __GetDawnAndDuskTime() -> tuple[datetime, datetime]:
     global __currentDate, __dawn, __dusk
 
     currentDate = date.today()
-    if currentDate == __currentDate:
+    if (__currentDate is not None) and (currentDate == __currentDate):
         return __dawn, __dusk
     
     __currentDate = currentDate
