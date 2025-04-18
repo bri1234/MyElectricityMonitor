@@ -71,7 +71,9 @@ def MainLoop() -> None:
 
     hm.InitializeCommunication()
     
+    counter = 0
     while True:
+        counter += 1
         st = time.time()
 
         CollectData(db, em, hm)
@@ -82,6 +84,9 @@ def MainLoop() -> None:
         delayTime = DATA_ACQUISITION_PERIOD_S - (et - st)
         if delayTime < 5:
             delayTime = 5
+
+        if counter % 20 == 0:
+            syslog.syslog(syslog.LOG_INFO, f"{APP_LOG_NAME} is running {counter}")
 
         time.sleep(delayTime)
 
