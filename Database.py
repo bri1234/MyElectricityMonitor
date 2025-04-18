@@ -58,7 +58,7 @@ class Database:
         self.__columnsInverter.extend(Database.__READINGS_INVERTER)
 
         self.__connection = sqlite3.connect(fileName)
-
+        
         self.__CreateTablesIfNotExists()
 
     def Cleanup(self) -> None:
@@ -67,6 +67,12 @@ class Database:
 
         if self.__connection:
             self.__connection.close()
+
+    def Commit(self) -> None:
+        """ Commits the current changes.
+        """
+        if self.__connection:
+            self.__connection.commit()
 
     def __CreateTablesIfNotExists(self) -> None:
         """ Creates all data tables in the database if the table does not already exists.
@@ -80,17 +86,17 @@ class Database:
         # create inverter data table
         columnsStr = ', '.join([f'"{column}" REAL' for column in self.__columnsInverter])
 
-        sql = f'CREATE TABLE IF NOT EXISTS Inverter ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        sql = f'CREATE TABLE IF NOT EXISTS Inverter ("time" INT NOT NULL PRIMARY KEY,{columnsStr});'
         connection.execute(sql)
         
         # create electricity meter 1 data table
         columnsStr = ', '.join([f'"{column}" REAL' for column in Database.__COLUMNS_ELECTRICITY_METER])
 
-        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter0 ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter0 ("time" INT NOT NULL PRIMARY KEY,{columnsStr});'
         connection.execute(sql)
         
         # create electricity meter 2 data table
-        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter1 ("time" INT NOT NULL PRIMARY KEY,{columnsStr}) STRICT'
+        sql = f'CREATE TABLE IF NOT EXISTS ElectricityMeter1 ("time" INT NOT NULL PRIMARY KEY,{columnsStr});'
         connection.execute(sql)
 
     def InsertReadingsElectricityMeter(self, electricityMeterNum : int, readings : dict[str, float]) -> None:
@@ -108,7 +114,7 @@ class Database:
 
         tm = int(time.time())
 
-        sql = f"INSERT INTO ElectricityMeter{electricityMeterNum} VALUES ({tm},{valuesStr})"
+        sql = f"INSERT INTO ElectricityMeter{electricityMeterNum} VALUES ({tm},{valuesStr});"
         self.__connection.execute(sql)
 
     def InsertReadingsInverter(self, readings : dict[str, float | list[dict[str, float]]]) -> None:
@@ -131,7 +137,6 @@ class Database:
 
         tm = int(time.time())
 
-        sql = f"INSERT INTO Inverter VALUES ({tm},{valuesStr})"
+        sql = f"INSERT INTO Inverter VALUES ({tm},{valuesStr});"
         self.__connection.execute(sql)
-
 

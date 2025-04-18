@@ -31,6 +31,7 @@ from datetime import date, datetime
 import time
 import astral
 import astral.sun
+import syslog
 
 # the SPI pins
 HM_CSN = 0
@@ -48,7 +49,11 @@ LOCATION = astral.LocationInfo("Freiberg", "Germany", "Europe/Berlin", LATITUDE,
 DATABASE_FILEPATH = "readings.db"
 DATABASE_NUMBER_OF_INVERTER_CHANNELS = 2
 
+# general
 DATA_ACQUISITION_PERIOD_S = 30
+APP_LOG_NAME = "Electricity and inverter monitor"
+
+#--------------------------------------------------------------------------------------------------
 
 def MainLoop() -> None:
     """ The application main loop.
@@ -60,9 +65,19 @@ def MainLoop() -> None:
 
     hm.InitializeCommunication()
     
-    for _ in range(60):
+    while True:
+        st = time.time()
+
         CollectData(db, em, hm)
-        time.sleep(DATA_ACQUISITION_PERIOD_S)
+        db.Commit()
+
+        et = time.time()
+
+        delayTime = DATA_ACQUISITION_PERIOD_S - (et - st)
+        if delayTime < 5:
+            delayTime = 5
+
+        time.sleep(delayTime)
 
 def CollectData(database : Database, electricityMeter : EbzDD3, inverter : HoymilesHmDtu) -> None:
     """ Collects the data from the electricity meter and inverter and stores it in the database.
@@ -74,12 +89,12 @@ def CollectData(database : Database, electricityMeter : EbzDD3, inverter : Hoymi
     """
     success, infoEm0 = electricityMeter.ReceiveInfo(0)
     if success:
-        EbzDD3.PrintInfo(infoEm0)
+        # EbzDD3.PrintInfo(infoEm0)
         database.InsertReadingsElectricityMeter(0, infoEm0)
 
     success, infoEm1 = electricityMeter.ReceiveInfo(1)
     if success:
-        EbzDD3.PrintInfo(infoEm1)
+        # EbzDD3.PrintInfo(infoEm1)
         database.InsertReadingsElectricityMeter(1, infoEm1)
 
     # collect the inverter data only when the sun shines
@@ -88,7 +103,7 @@ def CollectData(database : Database, electricityMeter : EbzDD3, inverter : Hoymi
     if dawn < now < dusk:
         success, infoHm = inverter.QueryInverterInfo()
         if success:
-            HoymilesHmDtu.PrintInverterInfo(infoHm)
+            # HoymilesHmDtu.PrintInverterInfo(infoHm)
             database.InsertReadingsInverter(infoHm)
 
 __currentDate : date | None = None
@@ -114,5 +129,13 @@ def __GetDawnAndDuskTime() -> tuple[datetime, datetime]:
 
 # main entry point
 if __name__ == "__main__":
-    MainLoop()
+
+    syslog.syslog(syslog.LOG_INFO, f"{APP_LOG_NAME} started")
+
+    try:
+        MainLoop()
+    except Exception as err:
+        syslog.syslog(syslog.LOG_ERR, f"{APP_LOG_NAME} error: {err}")
+    finally:
+        syslog.syslog(syslog.LOG_INFO, f"{APP_LOG_NAME} stopped")
     
