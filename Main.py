@@ -27,45 +27,91 @@ IN THE SOFTWARE.
 from EbzDD3 import EbzDD3
 from HoymilesHmDtu import HoymilesHmDtu
 from Database import Database
+from datetime import date, datetime
 import time
-import datetime
 import astral
+import astral.sun
 
 # the SPI pins
 HM_CSN = 0
 HM_CE = 24
 
+HM_SERIAL_NUMBER = "114184020874"
+
 # the geo coordinates to calculate the time for dawn and dusk
 LATITUDE = 50.92
 LONGITUDE = 13.33
 
+LOCATION = astral.LocationInfo("Freiberg", "Germany", "Europe/Berlin", LATITUDE, LONGITUDE)
+
+# database
+DATABASE_FILEPATH = "readings.db"
+DATABASE_NUMBER_OF_INVERTER_CHANNELS = 2
+
+DATA_ACQUISITION_PERIOD_S = 30
+
 def MainLoop() -> None:
+    """ The application main loop.
+    """
 
+    db = Database(DATABASE_FILEPATH, DATABASE_NUMBER_OF_INVERTER_CHANNELS)
     em = EbzDD3()
-    hm = HoymilesHmDtu("114184020874", HM_CSN, HM_CE)
-    db = Database("readings.db", numberOfInverterChannels=2)
-
+    hm = HoymilesHmDtu(HM_SERIAL_NUMBER, HM_CSN, HM_CE)
 
     hm.InitializeCommunication()
     
     for _ in range(60):
-        success, infoEm = em.ReceiveInfo(0)
-        if success:
-            db.InsertReadingsElectricityMeter(0, infoEm)
-            EbzDD3.PrintInfo(infoEm)
+        CollectData(db, em, hm)
+        time.sleep(DATA_ACQUISITION_PERIOD_S)
 
-        success, infoEm = em.ReceiveInfo(1)
-        if success:
-            db.InsertReadingsElectricityMeter(1, infoEm)
-            EbzDD3.PrintInfo(infoEm)
+def CollectData(database : Database, electricityMeter : EbzDD3, inverter : HoymilesHmDtu) -> None:
+    """ Collects the data from the electricity meter and inverter and stores it in the database.
 
-        success, infoHm = hm.QueryInverterInfo()
+    Args:
+        database (Database): The database to store the collected data.
+        electricityMeter (EbzDD3): The electricity meter.
+        inverter (HoymilesHmDtu): The inverter.
+    """
+    success, infoEm = electricityMeter.ReceiveInfo(0)
+    if success:
+        database.InsertReadingsElectricityMeter(0, infoEm)
+        EbzDD3.PrintInfo(infoEm)
+
+    success, infoEm = electricityMeter.ReceiveInfo(1)
+    if success:
+        database.InsertReadingsElectricityMeter(1, infoEm)
+        EbzDD3.PrintInfo(infoEm)
+
+    # collect the inverter data only when the sun shines
+    dawn, dusk = __GetDawnAndDuskTime()
+    if dawn < datetime.now() < dusk:
+        success, infoHm = inverter.QueryInverterInfo()
         if success:
-            db.InsertReadingsInverter(infoHm)
+            database.InsertReadingsInverter(infoHm)
             HoymilesHmDtu.PrintInverterInfo(infoHm)
 
-        time.sleep(30)
+__currentDate : date
+__dawn : datetime
+__dusk : datetime
 
+def __GetDawnAndDuskTime() -> tuple[datetime, datetime]:
+    """ Determines the dawn and dusk time for today.
+    """
+    global __currentDate, __dawn, __dusk
+
+    currentDate = date.today()
+    if currentDate == __currentDate:
+        return __dawn, __dusk
+    
+    __currentDate = currentDate
+
+    theSun = astral.sun.sun(LOCATION.observer, __currentDate)
+    __dawn = theSun["dawn"]
+    __dusk = theSun["dusk"]
+
+    return __dawn, __dusk
+
+# main entry point
 if __name__ == "__main__":
     MainLoop()
     

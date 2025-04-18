@@ -104,12 +104,11 @@ class Database:
         if electricityMeterNum < 0 or electricityMeterNum > 1:
             raise Exception(f"Invalid electricity meter number {electricityMeterNum}")
         
-        columnsStr = ','.join( [ f'"{key}"' for key in Database.__COLUMNS_ELECTRICITY_METER ] )
         valuesStr = ','.join([ str(readings[key]) for key in Database.__COLUMNS_ELECTRICITY_METER ])
 
         tm = int(time.time())
 
-        sql = f'INSERT INTO ElectricityMeter{electricityMeterNum} ("time",{columnsStr}) VALUES ({tm},{valuesStr})'
+        sql = f"INSERT INTO ElectricityMeter{electricityMeterNum} VALUES ({tm},{valuesStr})"
         self.__connection.execute(sql)
 
     def InsertReadingsInverter(self, readings : dict[str, float | list[dict[str, float]]]) -> None:
@@ -118,8 +117,6 @@ class Database:
         Args:
             readings (dict[str, float]): The solar inverter readings.
         """
-
-        columnsStr = ','.join( [ f'"{key}"' for key in self.__columnsInverter ] )
 
         readingsCh = readings["Channels"]
         if not isinstance(readingsCh, list):
@@ -134,7 +131,7 @@ class Database:
 
         tm = int(time.time())
 
-        sql = f'INSERT INTO Inverter ("time",{columnsStr}) VALUES ({tm},{valuesStr})'
+        sql = f"INSERT INTO Inverter VALUES ({tm},{valuesStr})"
         self.__connection.execute(sql)
 
 
