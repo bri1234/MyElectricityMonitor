@@ -28,6 +28,8 @@ from EbzDD3 import EbzDD3
 from HoymilesHmDtu import HoymilesHmDtu
 from Database import Database
 from datetime import date, datetime
+from pathlib import Path
+import os
 import time
 import astral
 import astral.sun
@@ -46,7 +48,7 @@ LONGITUDE = 13.33
 LOCATION = astral.LocationInfo("Freiberg", "Germany", "Europe/Berlin", LATITUDE, LONGITUDE)
 
 # database
-DATABASE_FILEPATH = "readings.db"
+DATABASE_FILEPATH = "/home/torsten/Database/electricity_monitor_readings.db"
 DATABASE_NUMBER_OF_INVERTER_CHANNELS = 2
 
 # general
@@ -58,6 +60,10 @@ APP_LOG_NAME = "Electricity and inverter monitor"
 def MainLoop() -> None:
     """ The application main loop.
     """
+
+    # create database directory if it does not exists
+    databaseDirectory = os.path.dirname(DATABASE_FILEPATH)
+    Path(databaseDirectory).mkdir(parents=True, exist_ok=True)
 
     db = Database(DATABASE_FILEPATH, DATABASE_NUMBER_OF_INVERTER_CHANNELS)
     em = EbzDD3("/dev/ttyAMA0")

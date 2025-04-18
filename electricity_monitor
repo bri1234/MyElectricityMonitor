@@ -1,0 +1,24 @@
+#! /bin/sh
+# /etc/init.d/electricity_monitor
+#
+
+# Some things that run always
+touch /var/lock/electricity_monitor
+
+# Carry out specific functions when asked to by the system
+case "$1" in
+  start)
+    echo "Starting script electricity monitor"
+    /usr/bin/python3 /home/torsten/MyEclectricityMonitor/Main.py
+    ;;
+  stop)
+    echo "Stopping script electricity monitor"
+    echo "not implemented"
+    ;;
+  *)
+    echo "Usage: /etc/init.d/electricity_monitor {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0
