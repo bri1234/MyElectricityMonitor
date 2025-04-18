@@ -28,15 +28,23 @@ from EbzDD3 import EbzDD3
 from HoymilesHmDtu import HoymilesHmDtu
 from Database import Database
 import time
+import datetime
+import astral
 
+# the SPI pins
 HM_CSN = 0
 HM_CE = 24
+
+# the geo coordinates to calculate the time for dawn and dusk
+LATITUDE = 50.92
+LONGITUDE = 13.33
 
 def MainLoop() -> None:
 
     em = EbzDD3()
     hm = HoymilesHmDtu("114184020874", HM_CSN, HM_CE)
     db = Database("readings.db", numberOfInverterChannels=2)
+
 
     hm.InitializeCommunication()
     
