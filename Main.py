@@ -27,6 +27,8 @@ IN THE SOFTWARE.
 from EbzDD3 import EbzDD3
 from HoymilesHmDtu import HoymilesHmDtu
 from Database import Database
+from Configuration import Configuration
+
 from datetime import date, datetime
 from pathlib import Path
 import os
@@ -35,25 +37,17 @@ import astral
 import astral.sun
 import syslog
 
+#--------------------------------------------------------------------------------------------------
+
 # the SPI pins
 HM_CSN = 0
 HM_CE = 24
 
-HM_SERIAL_NUMBER = "114184020874"
-
-# the geo coordinates to calculate the time for dawn and dusk
-LATITUDE = 50.92
-LONGITUDE = 13.33
-
-LOCATION = astral.LocationInfo("Freiberg", "Germany", "Europe/Berlin", LATITUDE, LONGITUDE)
-
-# database
-DATABASE_FILEPATH = "/home/torsten/Database/electricity_monitor_readings.db"
-DATABASE_NUMBER_OF_INVERTER_CHANNELS = 2
-
 # general
-DATA_ACQUISITION_PERIOD_S = 30
 APP_LOG_NAME = "Electricity and inverter monitor"
+
+# configuration
+__configuration = Configuration()
 
 #--------------------------------------------------------------------------------------------------
 
@@ -62,12 +56,12 @@ def MainLoop() -> None:
     """
 
     # create database directory if it does not exists
-    databaseDirectory = os.path.dirname(DATABASE_FILEPATH)
+    databaseDirectory = os.path.dirname(__configuration.DatabaseFilepath)
     Path(databaseDirectory).mkdir(parents=True, exist_ok=True)
 
-    db = Database(DATABASE_FILEPATH, DATABASE_NUMBER_OF_INVERTER_CHANNELS)
+    db = Database(__configuration.DatabaseFilepath, __configuration.InverterNumberOfChannels)
     em = EbzDD3("/dev/ttyAMA0")
-    hm = HoymilesHmDtu(HM_SERIAL_NUMBER, HM_CSN, HM_CE)
+    hm = HoymilesHmDtu(__configuration.InverterSerialNumber, HM_CSN, HM_CE)
 
     hm.InitializeCommunication()
     
@@ -81,7 +75,7 @@ def MainLoop() -> None:
 
         et = time.time()
 
-        delayTime = DATA_ACQUISITION_PERIOD_S - (et - st)
+        delayTime = __configuration.DataAcquisitionPeriod - (et - st)
         if delayTime < 5:
             delayTime = 5
 
@@ -132,7 +126,7 @@ def __GetDawnAndDuskTime() -> tuple[datetime, datetime]:
     
     __currentDate = currentDate
 
-    theSun = astral.sun.sun(LOCATION.observer, __currentDate)
+    theSun = astral.sun.sun(__configuration.Location.observer, __currentDate)
     __dawn = theSun["dawn"]
     __dusk = theSun["dusk"]
 
@@ -144,6 +138,9 @@ if __name__ == "__main__":
     syslog.syslog(syslog.LOG_INFO, f"{APP_LOG_NAME} started")
 
     try:
+        currentDirectory = os.path.dirname(__file__)
+        __configuration.Load(os.path.join(currentDirectory, "configuration.json"))
+
         MainLoop()
     except Exception as err:
         syslog.syslog(syslog.LOG_ERR, f"{APP_LOG_NAME} error: {err}")

@@ -79,9 +79,46 @@ python3 -m pip install pyrf24
 
 python3 -m pip install pyserial
 
+## Start the application automatically after boot: CRON job
+
+## Application configuration
+
+The application needs a configuration file with the following settings:
+
+```json
+{
+    "Location":
+    {
+        "City": "Freiberg",
+        "Region": "Germany",
+        "Timezone": "Europe/Berlin",
+        "Latitude": 50.92,
+        "Longitude": 13.33
+    },
+    "Inverter":
+    {
+        "SerialNumber": "1141xxxxxxxx",
+        "NumberOfChannels": 2
+    },
+    "Database":
+    {
+        "Filepath": "/home/data/Database/electricity_monitor_readings.db",
+        "DataAcquisitionPeriod": 30
+    }
+}
+```
+
+- Location: the location to computer dawn and dusk time
+- Inverter: settings to query the inverter data
+- Database/Filepath: where to store the sqlite database
+- Database/DataAcquisitionPeriod period of data acquisition and storage in seconds
+
 # Information and meter readings
 
 ## eBZ DD3 meter readings
+
+**Attention:** extended electricity meter information must be activated!
+Set **Info: on** in the electricity meter settings.
 
 +A: Active energy, grid supplies to customer.
 -A: Active energy, customer supplies to grid
@@ -98,4 +135,7 @@ python3 -m pip install pyserial
 | 01 00 24 07 00 FF | Instantaneous power phase L1   | unit/resolution 0,01W                         |
 | 01 00 38 07 00 FF | Instantaneous power phase L2   | unit/resolution 0,01W                         |
 | 01 00 4C 07 00 FF | Instantaneous power phase L3   | unit/resolution 0,01W                         |
+
+# Visualization with Grafana
+
 
