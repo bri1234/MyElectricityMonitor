@@ -108,7 +108,7 @@ The application needs a configuration file with the following settings:
 }
 ```
 
-- Location: the location to computer dawn and dusk time
+- Location: the location to compute dawn and dusk time
 - Inverter: settings to query the inverter data
 - Database/Filepath: where to store the sqlite database
 - Database/DataAcquisitionPeriod period of data acquisition and storage in seconds
