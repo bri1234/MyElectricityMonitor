@@ -81,6 +81,9 @@ python3 -m pip install pyserial
 
 ## Start the application automatically after boot: CRON job
 
+- use the command **crontab -e** to edit the user crontab
+- add **@reboot sleep 30 && /usr/bin/python3 /home/user/MyElectricityMonitor/Main.py** to start the application 30 s after reboot
+
 ## Application configuration
 
 The application needs a configuration file with the following settings:
