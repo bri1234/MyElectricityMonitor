@@ -105,7 +105,7 @@ The application needs a configuration file with the following settings:
     },
     "Database":
     {
-        "Filepath": "/home/data/Database/electricity_monitor_readings.db",
+        "Filepath": "/database/electricity_monitor_readings.db",
         "DataAcquisitionPeriod": 30
     }
 }
@@ -114,6 +114,7 @@ The application needs a configuration file with the following settings:
 - Location: the location to compute dawn and dusk time
 - Inverter: settings to query the inverter data
 - Database/Filepath: where to store the sqlite database
+  **ATTENTION:** the database must not be located in **/home/...**! Because Grafana does not like it.
 - Database/DataAcquisitionPeriod: period of data acquisition and storage in seconds
 
 # Information and meter readings
@@ -141,4 +142,53 @@ Set **Info: on** in the electricity meter settings.
 
 # Visualization with Grafana
 
+## Install Grafana
+
+1. Add the APT key used to authenticate packages
+```bash
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+```
+
+2. Add the Grafana APT repository
+```bash
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+```
+
+3. Install Grafana
+```bash
+sudo apt-get update
+sudo apt-get install grafana
+```
+
+4. Enable the Grafana server
+```bash
+sudo /bin/systemctl daemon-reload
+sudo /bin/systemctl enable grafana-server
+```
+
+5. Start the Grafana server:
+```bash
+sudo /bin/systemctl start grafana-server
+```
+
+6. Test Grafana
+Open the address **http://<ip_address>:3000** within a webbrowser.
+You should see the Grafana login page.
+
+7. Change Grafana default password
+Log in to Grafana with the default username **admin**, and the default password **admin**.
+Change the password for the admin user when asked.
+
+## Grafana configuration
+
+### Install sqlite plugin
+```bash
+sudo grafana-cli plugins install frser-sqlite-datasource
+```
+
+### Configure database
+- Database directory must readable by all users:
+```bash
+sudo chmod 777 /database
+```
 

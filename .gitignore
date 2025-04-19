@@ -5,6 +5,7 @@ __pycache__/
 
 readings.*
 configuration.json
+*~
 
 # C extensions
 *.so
