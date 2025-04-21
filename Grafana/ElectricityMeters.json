@@ -195,6 +195,145 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "+A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "-A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L1"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L2"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L3"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter0\"\nWHERE time = (SELECT max(time) FROM \"ElectricityMeter0\")\n\n",
+          "queryType": "table",
+          "rawQueryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter0\"\nWHERE time = (SELECT max(time) FROM \"ElectricityMeter0\")\n\n",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Stromzähler Haus",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -306,7 +445,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT time,\n\"P L1\"\nFROM \"ElectricityMeter1\"\nWHERE time >= 1745160781606 / 1000 and time < 1745182381606 / 1000",
+          "queryText": "SELECT time,\n\"P L1\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"P L1\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "A",
@@ -321,7 +460,7 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\n\"P L2\"\nFROM \"ElectricityMeter1\"\nWHERE time >= 1745160781606 / 1000 and time < 1745182381606 / 1000",
+          "queryText": "SELECT time,\n\"P L2\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"P L2\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "B",
@@ -336,7 +475,7 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\n\"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= 1745160781606 / 1000 and time < 1745182381606 / 1000",
+          "queryText": "SELECT time,\n\"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "C",
@@ -348,6 +487,145 @@
       ],
       "title": "Stromzähler Wärmepumpe",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "+A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "-A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L1"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L2"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P L3"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time = (SELECT max(time) FROM \"ElectricityMeter1\")\n\n",
+          "queryType": "table",
+          "rawQueryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time = (SELECT max(time) FROM \"ElectricityMeter1\")\n\n",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Stromzähler Wärmepumpe",
+      "type": "stat"
     }
   ],
   "preload": false,
@@ -364,5 +642,5 @@
   "timezone": "browser",
   "title": "Stromzähler",
   "uid": "aejhgfmeah0qoa",
-  "version": 4
+  "version": 7
 }

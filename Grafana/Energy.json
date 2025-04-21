@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -38,9 +38,9 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 15,
+            "barWidthFactor": 0.8,
+            "drawStyle": "bars",
+            "fillOpacity": 20,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -82,36 +82,12 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "AC"
+              "options": "Energie"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "watt"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Modul 1"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watt"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Modul 2"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watt"
+                "value": "kwatth"
               }
             ]
           }
@@ -123,7 +99,7 @@
         "x": 0,
         "y": 0
       },
-      "id": 2,
+      "id": 3,
       "options": {
         "legend": {
           "calcs": [],
@@ -140,47 +116,17 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT time,\n\"AC P\" as \"AC\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryText": "SELECT time,\nmax(\"+A\") - min(\"+A\") as \"Energie\"\nFROM \"ElectricityMeter1\"\nWHERE time >= 1744638835995 / 1000 and time < 1745243635995 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
           "queryType": "table",
-          "rawQueryText": "SELECT time,\n\"AC P\" as \"AC\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "rawQueryText": "SELECT time,\nmax(\"+A\") - min(\"+A\") as \"Energie\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
           "refId": "A",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        },
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "aejebte1e8rnkd"
-          },
-          "hide": false,
-          "queryText": "SELECT time,\n\"CH0 DC P\" as \"Modul 1\"\nFROM \"Inverter\"\nWHERE time >= 1745152239917 / 1000 and time < 1745155839917 / 1000",
-          "queryType": "table",
-          "rawQueryText": "SELECT time,\n\"CH0 DC P\" as \"Modul 1\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
-          "refId": "B",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        },
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "aejebte1e8rnkd"
-          },
-          "hide": false,
-          "queryText": "SELECT time,\n\"CH1 DC P\" as \"Modul 2\"\nFROM \"Inverter\"\nWHERE time >= 1745152239917 / 1000 and time < 1745155839917 / 1000",
-          "queryType": "table",
-          "rawQueryText": "SELECT time,\n\"CH1 DC P\" as \"Modul 2\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
-          "refId": "C",
           "timeColumns": [
             "time",
             "ts"
           ]
         }
       ],
-      "title": "Leistung Wechselrichter",
+      "title": "Verbrauch Wärmepumpe",
       "type": "timeseries"
     },
     {
@@ -285,7 +231,7 @@
         "x": 12,
         "y": 0
       },
-      "id": 3,
+      "id": 2,
       "options": {
         "legend": {
           "calcs": [],
@@ -307,7 +253,7 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\nmax(\"CH0 DC E day\" + \"CH1 DC E day\") as \"Energie\"\nFROM \"Inverter\"\nWHERE time >= 1744638306953 / 1000 and time < 1745243106953 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
+          "queryText": "SELECT time,\nmax(\"CH0 DC E day\" + \"CH1 DC E day\") as \"Energie\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
           "queryType": "time series",
           "rawQueryText": "SELECT time,\nmax(\"CH0 DC E day\" + \"CH1 DC E day\") as \"Energie\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
           "refId": "C",
@@ -317,7 +263,7 @@
           ]
         },
         {
-          "queryText": "SELECT time,\nmax(\"CH0 DC E day\") as \"Energie Modul 1\"\nFROM \"Inverter\"\nWHERE time >= 1744638306953 / 1000 and time < 1745243106953 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
+          "queryText": "SELECT time,\nmax(\"CH0 DC E day\") as \"Energie Modul 1\"\nFROM \"Inverter\"\nWHERE time >= 1745221829220 / 1000 and time < 1745243429220 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
           "queryType": "time series",
           "rawQueryText": "SELECT time,\nmax(\"CH0 DC E day\") as \"Energie Modul 1\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
           "refId": "A",
@@ -342,7 +288,7 @@
           ]
         }
       ],
-      "title": "Energie Ertrag",
+      "title": "Wechselrichter Ertrag",
       "type": "timeseries"
     },
     {
@@ -358,13 +304,13 @@
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
-            "axisColorMode": "series",
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 15,
+            "barWidthFactor": 0.8,
+            "drawStyle": "bars",
+            "fillOpacity": 20,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -406,24 +352,12 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "T"
+              "options": "Energie"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "celsius"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "AC V"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "volt"
+                "value": "kwatth"
               }
             ]
           }
@@ -443,9 +377,6 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "timezone": [
-          ""
-        ],
         "tooltip": {
           "hideZeros": false,
           "mode": "single",
@@ -459,32 +390,125 @@
             "type": "frser-sqlite-datasource",
             "uid": "aejebte1e8rnkd"
           },
-          "queryText": "SELECT time,\n\"T\"\nFROM \"Inverter\"\nWHERE time >= 1745128839933 / 1000 and time < 1745150439933 / 1000",
-          "queryType": "time series",
-          "rawQueryText": "SELECT time,\n\"T\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryText": "SELECT time,\nmax(\"+A\") - min(\"+A\") as \"Energie\"\nFROM \"ElectricityMeter0\"\nWHERE time >= 1744638835995 / 1000 and time < 1745243635995 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\nmax(\"+A\") - min(\"+A\") as \"Energie\"\nFROM \"ElectricityMeter0\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
           "refId": "A",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        },
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "aejebte1e8rnkd"
-          },
-          "hide": false,
-          "queryText": "SELECT time,\n\"AC V\"\nFROM \"Inverter\"\nWHERE time >= 1745128839933 / 1000 and time < 1745150439933 / 1000",
-          "queryType": "time series",
-          "rawQueryText": "SELECT time,\n\"AC V\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
-          "refId": "B",
           "timeColumns": [
             "time",
             "ts"
           ]
         }
       ],
-      "title": "Temperatur und Netzspannung",
+      "title": "Verbrauch Haus",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.8,
+            "drawStyle": "bars",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "queryText": "SELECT time,\nmax(\"-A\") - min(\"-A\") as \"Energie\"\nFROM \"ElectricityMeter0\"\nWHERE time >= 1744640004969 / 1000 and time < 1745244804969 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\nmax(\"-A\") - min(\"-A\") as \"Energie\"\nFROM \"ElectricityMeter0\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Einspeisung",
       "type": "timeseries"
     }
   ],
@@ -495,12 +519,12 @@
     "list": []
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-2d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wechselrichter",
-  "uid": "fejh683g8uy2of",
-  "version": 16
+  "title": "Energie",
+  "uid": "aejl4bg2tsf0gb",
+  "version": 8
 }

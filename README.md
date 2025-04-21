@@ -192,3 +192,7 @@ sudo grafana-cli plugins install frser-sqlite-datasource
 sudo chmod 777 /database
 ```
 
+### Dashboards
+
+Grafana dashboard configurations are located in the directory **Grafana** as JSON files.
+
