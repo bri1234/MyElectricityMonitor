@@ -6,6 +6,7 @@ __pycache__/
 readings.*
 configuration.json
 *~
+*.lgd*
 
 # C extensions
 *.so

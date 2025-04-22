@@ -187,12 +187,45 @@ sudo grafana-cli plugins install frser-sqlite-datasource
 ```
 
 ### Configure database
-- Database directory must readable by all users:
+Database directory must readable by all users:
 ```bash
 sudo chmod 777 /database
 ```
 
 ### Dashboards
-
 Grafana dashboard configurations are located in the directory **Grafana** as JSON files.
+Import the dashboards.
+
+### Grafana HTML access
+Edit Grafana settings:
+```bash
+sudo joe /etc/grafana/grafana.ini
+```
+Change settings:
+```ini
+[auth.anonymous]
+# enable anonymous access
+enabled = true
+
+[security]
+# set to true if you want to allow browsers to render Grafana in a <frame>, <iframe>, <embed> or <object>. default is false.
+allow_embedding = true
+```
+
+Restart Grafana:
+```bash
+sudo /bin/systemctl restart grafana-server
+```
+
+## HTML
+Install Apache 2 webserver on Raspberry Pi:
+
+```bash
+sudo apt install apache2
+```
+
+Copy HTML page to webserver root directory:
+```bash
+sudo cp Html/index.html /var/www/html
+```
 
