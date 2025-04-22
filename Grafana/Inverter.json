@@ -423,7 +423,7 @@
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "vertical",
+        "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
@@ -439,7 +439,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= 1745313532715 / 1000 and time < 1745356732715 / 1000",
+          "queryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= 1745337238901 / 1000 and time < 1745358838901 / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "A",
@@ -550,7 +550,7 @@
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "vertical",
+        "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
@@ -566,7 +566,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT time,\n\"CH1 DC V\" as \"Spannung\",\n\"CH1 DC I\" as \"Strom\",\n\"CH1 DC P\" as \"Leistung\",\n\"CH1 DC E day\" as \"Energie Tag\",\n\"CH1 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryText": "SELECT time,\n\"CH1 DC V\" as \"Spannung\",\n\"CH1 DC I\" as \"Strom\",\n\"CH1 DC P\" as \"Leistung\",\n\"CH1 DC E day\" as \"Energie Tag\",\n\"CH1 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= 1745337238901 / 1000 and time < 1745358838901 / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"CH1 DC V\" as \"Spannung\",\n\"CH1 DC I\" as \"Strom\",\n\"CH1 DC P\" as \"Leistung\",\n\"CH1 DC E day\" as \"Energie Tag\",\n\"CH1 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "A",
@@ -653,7 +653,7 @@
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "vertical",
+        "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
@@ -674,7 +674,7 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= 1745337238901 / 1000 and time < 1745358838901 / 1000",
           "queryType": "time series",
           "rawQueryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "C",
@@ -702,5 +702,5 @@
   "timezone": "browser",
   "title": "Wechselrichter",
   "uid": "fejh683g8uy2of",
-  "version": 21
+  "version": 22
 }

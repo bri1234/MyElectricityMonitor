@@ -297,7 +297,7 @@
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "vertical",
+        "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
@@ -313,7 +313,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter0\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\n",
+          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter0\"\nWHERE time >= 1745337198983 / 1000 and time < 1745358798983 / 1000\n",
           "queryType": "table",
           "rawQueryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter0\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\n",
           "refId": "A",
@@ -598,7 +598,7 @@
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "vertical",
+        "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
@@ -614,7 +614,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\n\n",
+          "queryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= 1745337198983 / 1000 and time < 1745358798983 / 1000\n\n",
           "queryType": "table",
           "rawQueryText": "SELECT \"+A\", \"-A\", \"P\", \"P L1\", \"P L2\", \"P L3\"\nFROM \"ElectricityMeter1\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\n\n",
           "refId": "A",
@@ -642,5 +642,5 @@
   "timezone": "browser",
   "title": "Stromzähler",
   "uid": "aejhgfmeah0qoa",
-  "version": 9
+  "version": 10
 }
