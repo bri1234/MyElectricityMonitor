@@ -196,168 +196,6 @@
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.8,
-            "drawStyle": "bars",
-            "fillOpacity": 25,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Energie Modul 1"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watth"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Energie Modul 2"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watth"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Energie"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watth"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "id": 3,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "aejebte1e8rnkd"
-          },
-          "hide": false,
-          "queryText": "SELECT time,\nmax(\"CH0 DC E day\" + \"CH1 DC E day\") as \"Energie\"\nFROM \"Inverter\"\nWHERE time >= 1744638306953 / 1000 and time < 1745243106953 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "queryType": "time series",
-          "rawQueryText": "SELECT time,\nmax(\"CH0 DC E day\" + \"CH1 DC E day\") as \"Energie\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "refId": "C",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        },
-        {
-          "queryText": "SELECT time,\nmax(\"CH0 DC E day\") as \"Energie Modul 1\"\nFROM \"Inverter\"\nWHERE time >= 1744638306953 / 1000 and time < 1745243106953 / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "queryType": "time series",
-          "rawQueryText": "SELECT time,\nmax(\"CH0 DC E day\") as \"Energie Modul 1\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "refId": "A",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        },
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "aejebte1e8rnkd"
-          },
-          "hide": false,
-          "queryText": "SELECT time,\nmax(\"CH1 DC E day\") as \"Energie Modul 2\"\nFROM \"Inverter\"\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "queryType": "time series",
-          "rawQueryText": "SELECT time,\nmax(\"CH1 DC E day\") as \"Energie Modul 2\"\nFROM \"Inverter\"\nGROUP BY date(time, \"unixepoch\")\nORDER BY time\n\n",
-          "refId": "B",
-          "timeColumns": [
-            "time",
-            "ts"
-          ]
-        }
-      ],
-      "title": "Energie Ertrag",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "aejebte1e8rnkd"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
             "axisColorMode": "series",
             "axisLabel": "",
             "axisPlacement": "auto",
@@ -432,8 +270,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
+        "x": 12,
+        "y": 0
       },
       "id": 1,
       "options": {
@@ -459,7 +297,7 @@
             "type": "frser-sqlite-datasource",
             "uid": "aejebte1e8rnkd"
           },
-          "queryText": "SELECT time,\n\"T\"\nFROM \"Inverter\"\nWHERE time >= 1745128839933 / 1000 and time < 1745150439933 / 1000",
+          "queryText": "SELECT time,\n\"T\"\nFROM \"Inverter\"\nWHERE time >= 1745313532715 / 1000 and time < 1745356732715 / 1000",
           "queryType": "time series",
           "rawQueryText": "SELECT time,\n\"T\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "A",
@@ -474,7 +312,7 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\n\"AC V\"\nFROM \"Inverter\"\nWHERE time >= 1745128839933 / 1000 and time < 1745150439933 / 1000",
+          "queryText": "SELECT time,\n\"AC V\"\nFROM \"Inverter\"\nWHERE time >= 1745313532715 / 1000 and time < 1745356732715 / 1000",
           "queryType": "time series",
           "rawQueryText": "SELECT time,\n\"AC V\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "B",
@@ -486,6 +324,368 @@
       ],
       "title": "Temperatur und Netzspannung",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Spannung"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "volt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Strom"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "amp"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Leistung"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie Tag"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie gesamt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "queryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= 1745313532715 / 1000 and time < 1745356732715 / 1000",
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Modul 1",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Spannung"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "volt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Strom"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "amp"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Leistung"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie Tag"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie gesamt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "queryText": "SELECT time,\n\"CH1 DC V\" as \"Spannung\",\n\"CH1 DC I\" as \"Strom\",\n\"CH1 DC P\" as \"Leistung\",\n\"CH1 DC E day\" as \"Energie Tag\",\n\"CH1 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryType": "table",
+          "rawQueryText": "SELECT time,\n\"CH1 DC V\" as \"Spannung\",\n\"CH1 DC I\" as \"Strom\",\n\"CH1 DC P\" as \"Leistung\",\n\"CH1 DC E day\" as \"Energie Tag\",\n\"CH1 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "Modul 2",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "aejebte1e8rnkd"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Strom"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "amp"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Frequenz"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "hertz"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Blindleistung"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "voltampreact"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "aejebte1e8rnkd"
+          },
+          "hide": false,
+          "queryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "queryType": "time series",
+          "rawQueryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "refId": "C",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "AC",
+      "type": "stat"
     }
   ],
   "preload": false,
@@ -495,12 +695,12 @@
     "list": []
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Wechselrichter",
   "uid": "fejh683g8uy2of",
-  "version": 16
+  "version": 21
 }
