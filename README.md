@@ -47,7 +47,9 @@ nRF24L01+ CE pin 3 can be connected to an other Raspberry PI GPIO pin.
 
 ## Rapsberry PI enable UART for electricity meters
 
+```bash
 sudo raspi-config
+```
 
 "Interface Options" -> "Serial Port"
 
@@ -57,7 +59,9 @@ sudo raspi-config
 
 ## Raspberry PI enable SPI for nRF24L01+
 
+```bash
 sudo raspi-config
+```
 
 "Interface Options" -> "SPI"
 
@@ -65,24 +69,38 @@ sudo raspi-config
 
 ## Raspberry PI Python GPIO module: gpiozero
 
+```bash
 sudo python3 -m pip install gpiozero
+```
 
 ## Raspebrry PI Python module for nRF24L01+: pyrf24
 
 This Python code needs the pyrf24 module for communication. Install the module with the following line:
 
-python3 -m pip install pyrf24
+```bash
+sudo python3 -m pip install pyrf24
+```
 
 (see https://github.com/nRF24/pyRF24)
 
 ## Raspberry PI Python GPIO module: pyserial
 
-python3 -m pip install pyserial
+```bash
+sudo python3 -m pip install pyserial
+```
 
 ## Start the application automatically after boot: CRON job
 
-- use the command **crontab -e** to edit the user crontab
-- add **@reboot sleep 30 && /usr/bin/python3 /home/user/MyElectricityMonitor/Main.py** to start the application 30 s after reboot
+Use the command **crontab -e** to edit the user crontab:
+
+```bash
+crontab -e
+```
+
+Add cronjob to start the application 30 s after reboot:
+```
+@reboot sleep 30 && /usr/bin/python3 /home/user/MyElectricityMonitor/Main.py
+```
 
 ## Application configuration
 
