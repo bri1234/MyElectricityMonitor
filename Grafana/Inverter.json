@@ -439,7 +439,7 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
-          "queryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= 1745337238901 / 1000 and time < 1745358838901 / 1000",
+          "queryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "queryType": "table",
           "rawQueryText": "SELECT time,\n\"CH0 DC V\" as \"Spannung\",\n\"CH0 DC I\" as \"Strom\",\n\"CH0 DC P\" as \"Leistung\",\n\"CH0 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" as \"Energie gesamt\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "A",
@@ -639,6 +639,30 @@
                 "value": "voltampreact"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie Tag"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Energie gesamt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "kwatth"
+              }
+            ]
           }
         ]
       },
@@ -674,9 +698,9 @@
             "uid": "aejebte1e8rnkd"
           },
           "hide": false,
-          "queryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= 1745337238901 / 1000 and time < 1745358838901 / 1000",
+          "queryText": "SELECT time,\n\"CH0 DC E day\" + \"CH1 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" + \"CH1 DC E total\" as \"Energie gesamt\",\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "queryType": "time series",
-          "rawQueryText": "SELECT time,\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
+          "rawQueryText": "SELECT time,\n\"CH0 DC E day\" + \"CH1 DC E day\" as \"Energie Tag\",\n\"CH0 DC E total\" + \"CH1 DC E total\" as \"Energie gesamt\",\n\"AC I\" as \"Strom\",\n\"AC F\" as \"Frequenz\",\n\"AC Q\" as \"Blindleistung\",\n\"AC PF\" as \"Power factor\"\nFROM \"Inverter\"\nWHERE time >= $__from / 1000 and time < $__to / 1000",
           "refId": "C",
           "timeColumns": [
             "time",
@@ -702,5 +726,5 @@
   "timezone": "browser",
   "title": "Wechselrichter",
   "uid": "fejh683g8uy2of",
-  "version": 22
+  "version": 23
 }
